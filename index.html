@@ -711,11 +711,13 @@ const playerId = getPlayerId();
   });
 
   // ---------- Room code generation ----------
-  const words = ['ACE','BIRDIE','CHAINS','MULLIGAN','ALBATROSS','TEEBOX','ROLLER','SPIKE'];
   function generateCode(){
-    const word = words[Math.floor(Math.random() * words.length)];
-    const num = Math.floor(10 + Math.random() * 89);
-    return word + '-' + num;
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L — easy to read aloud
+    let code = '';
+    for (let i = 0; i < 4; i++){
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
   }
   document.getElementById('generatedCode').textContent = generateCode();
   tabHost.addEventListener('click', () => {
