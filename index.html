@@ -498,6 +498,11 @@
     transition: box-shadow .15s ease, transform .15s ease, opacity .15s ease;
   }
   .player-chip.leader{ border-color: var(--accent-gold); }
+  .player-chip.self{
+    box-shadow: 0 0 0 2px var(--accent-teal);
+    background: color-mix(in srgb, var(--accent-teal) 14%, var(--bg-elevated));
+  }
+  .player-chip{ cursor: pointer; }
   .player-chip .crown{
     position: absolute;
     top: -11px;
@@ -604,10 +609,22 @@
     border: 1.5px solid var(--border-strong);
     background: var(--surface);
     cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
     transition: transform .15s ease, opacity .15s ease;
   }
   .power-card:active{ cursor: grabbing; }
   .power-card.dragging{ opacity: 0.35; transform: scale(0.96); }
+  .drag-ghost{
+    position: fixed;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.92;
+    transform: rotate(-3deg) scale(1.04);
+    box-shadow: 0 18px 34px -14px rgba(0,0,0,0.45);
+  }
   .power-card.type-help{ border-color: var(--accent-teal); }
   .power-card.type-disrupt{ border-color: var(--accent-coral); }
   .power-card.tier-legendary{
@@ -664,6 +681,92 @@
     text-align: center;
   }
   .toast.visible{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Player detail modal ---------- */
+  .modal-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 60;
+  }
+  .modal-card{
+    background: var(--bg-elevated);
+    border-radius: 24px 24px 0 0;
+    width: 100%;
+    max-width: 460px;
+    max-height: 82vh;
+    overflow-y: auto;
+    padding: 22px 20px 28px;
+    position: relative;
+    animation: modal-up .2s ease;
+  }
+  @keyframes modal-up{ from{ transform: translateY(24px); opacity: 0; } to{ transform: translateY(0); opacity: 1; } }
+  .modal-close{
+    position: absolute;
+    top: 14px; right: 16px;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .modal-header{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+    padding-right: 40px;
+  }
+  .modal-header .disc-chip{ width: 52px; height: 52px; font-size: 1.4rem; flex-shrink: 0; }
+  .modal-header .modal-name{ font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+  .modal-header .modal-sub{ font-size: 0.8rem; color: var(--ink-muted); }
+  .modal-section-title{
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin: 18px 0 8px;
+  }
+  .modal-power-row{
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    margin-bottom: 8px;
+  }
+  .modal-power-row .badge{
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    padding: 3px 6px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .badge.type-help{ background: color-mix(in srgb, var(--accent-teal) 20%, transparent); color: var(--accent-teal); }
+  .badge.type-disrupt{ background: color-mix(in srgb, var(--accent-coral) 20%, transparent); color: var(--accent-coral); }
+  .modal-power-row .info strong{ display: block; font-size: 0.86rem; }
+  .modal-power-row .info span{ font-size: 0.75rem; color: var(--ink-muted); }
+  .modal-empty{ font-size: 0.82rem; color: var(--ink-muted); padding: 6px 0 2px; }
+  .stat-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-box{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-box .stat-value{ font-family: var(--font-mono); font-weight: 700; font-size: 1.15rem; }
+  .stat-box .stat-label{ font-size: 0.68rem; color: var(--ink-muted); margin-top: 2px; }
 
   @media (min-width: 460px){
     body{ padding: 24px 0; }
@@ -815,6 +918,13 @@
   </main>
 
   <footer>Prototype build — running locally via GitHub Pages</footer>
+</div>
+
+<div class="modal-overlay" id="playerModalOverlay" hidden>
+  <div class="modal-card">
+    <button class="modal-close" id="playerModalClose" type="button" aria-label="Close">✕</button>
+    <div id="playerModalContent"></div>
+  </div>
 </div>
 
 <script type="module">
@@ -1176,7 +1286,8 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     leaderboardEl.innerHTML = '';
     ranked.forEach(({ id, p, value }) => {
       const chip = document.createElement('div');
-      chip.className = 'player-chip';
+      chip.className = 'player-chip' + (id === playerId ? ' self' : '');
+      chip.dataset.playerId = id;
       const isLeader = ranked.length > 1 && value === bestValue;
       if (isLeader) chip.classList.add('leader');
       const effects = p.activeEffects ? Object.values(p.activeEffects) : [];
@@ -1187,9 +1298,14 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
         <div class="chip-name">${p.name || 'Player'}${id === playerId ? ' (you)' : ''}</div>
         ${effects.length ? `<div class="active-effects">${effects.map(() => '<span class="effect-dot"></span>').join('')}</div>` : ''}
       `;
-      attachDropHandlers(chip, id);
+      chip.addEventListener('click', () => openPlayerModal(room, id));
       leaderboardEl.appendChild(chip);
     });
+
+    // keep an open modal in sync with live room updates
+    if (openModalPlayerId && !playerModalOverlay.hidden) {
+      openPlayerModal(room, openModalPlayerId);
+    }
   }
 
   function renderHole(code, room){
@@ -1232,18 +1348,15 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       if (!power) return;
       const card = document.createElement('div');
       card.className = `power-card type-${power.type} tier-${power.tier}`;
-      card.draggable = true;
       card.innerHTML = `
         <div class="power-tier">${power.tier} · ${power.type}</div>
         <div class="power-name">${power.name}</div>
         <div class="power-desc">${power.description}</div>
       `;
-      card.addEventListener('dragstart', (e) => {
-        card.classList.add('dragging');
-        e.dataTransfer.setData('text/plain', JSON.stringify({ instanceId, powerId, type: power.type }));
-        e.dataTransfer.effectAllowed = 'move';
+      card.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        startDrag(e, card, instanceId, powerId, power.type);
       });
-      card.addEventListener('dragend', () => card.classList.remove('dragging'));
       powersTray.appendChild(card);
     });
     const emptySlots = Math.max(0, 3 - myPowers.length);
@@ -1257,30 +1370,73 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     }
   }
 
-  function attachDropHandlers(chip, targetPlayerId){
-    chip.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const dragging = document.querySelector('.power-card.dragging');
-      if (!dragging) return;
-      const type = dragging.className.includes('type-help') ? 'help' : 'disrupt';
-      const valid = (type === 'help' && targetPlayerId === playerId) || (type === 'disrupt' && targetPlayerId !== playerId);
-      chip.classList.toggle('drop-target-valid', valid);
-      chip.classList.toggle('drop-target-invalid', !valid);
-      e.dataTransfer.dropEffect = valid ? 'move' : 'none';
+  // ---------- Custom pointer-based drag & drop (works on touch + mouse) ----------
+  let activeDrag = null;
+
+  function positionGhost(ghost, x, y){
+    ghost.style.left = (x - ghost.offsetWidth / 2) + 'px';
+    ghost.style.top = (y - 36) + 'px';
+  }
+
+  function updateDropTargets(x, y, type){
+    document.querySelectorAll('.player-chip').forEach(chip => {
+      const rect = chip.getBoundingClientRect();
+      const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      const targetId = chip.dataset.playerId;
+      const valid = (type === 'help' && targetId === playerId) || (type === 'disrupt' && targetId !== playerId);
+      chip.classList.toggle('drop-target-valid', inside && valid);
+      chip.classList.toggle('drop-target-invalid', inside && !valid);
     });
-    chip.addEventListener('dragleave', () => {
-      chip.classList.remove('drop-target-valid', 'drop-target-invalid');
-    });
-    chip.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      chip.classList.remove('drop-target-valid', 'drop-target-invalid');
-      const raw = e.dataTransfer.getData('text/plain');
-      if (!raw) return;
-      const { instanceId, powerId, type } = JSON.parse(raw);
-      const valid = (type === 'help' && targetPlayerId === playerId) || (type === 'disrupt' && targetPlayerId !== playerId);
-      if (!valid) return;
-      await usePower(instanceId, powerId, targetPlayerId);
-    });
+  }
+
+  function startDrag(e, card, instanceId, powerId, type){
+    try { card.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
+    card.classList.add('dragging');
+
+    const rect = card.getBoundingClientRect();
+    const ghost = card.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    ghost.style.width = rect.width + 'px';
+    document.body.appendChild(ghost);
+    positionGhost(ghost, e.clientX, e.clientY);
+
+    const drag = { pointerId: e.pointerId, instanceId, powerId, type, card, ghost };
+    activeDrag = drag;
+
+    function onMove(ev){
+      if (ev.pointerId !== drag.pointerId) return;
+      positionGhost(drag.ghost, ev.clientX, ev.clientY);
+      updateDropTargets(ev.clientX, ev.clientY, drag.type);
+    }
+    async function onUp(ev){
+      if (ev.pointerId !== drag.pointerId) return;
+      card.removeEventListener('pointermove', onMove);
+      card.removeEventListener('pointerup', onUp);
+      card.removeEventListener('pointercancel', onUp);
+      await finishDrag(ev.clientX, ev.clientY, drag);
+    }
+
+    card.addEventListener('pointermove', onMove);
+    card.addEventListener('pointerup', onUp);
+    card.addEventListener('pointercancel', onUp);
+  }
+
+  async function finishDrag(x, y, drag){
+    activeDrag = null;
+    drag.card.classList.remove('dragging');
+    drag.ghost.remove();
+    document.querySelectorAll('.player-chip').forEach(c => c.classList.remove('drop-target-valid', 'drop-target-invalid'));
+
+    const el = document.elementFromPoint(x, y);
+    const chip = el ? el.closest('.player-chip') : null;
+    if (!chip) return;
+    const targetId = chip.dataset.playerId;
+    const valid = (drag.type === 'help' && targetId === playerId) || (drag.type === 'disrupt' && targetId !== playerId);
+    if (!valid) {
+      showToast("That power can't be used there.");
+      return;
+    }
+    await usePower(drag.instanceId, drag.powerId, targetId);
   }
 
   async function usePower(instanceId, powerId, targetPlayerId){
@@ -1292,12 +1448,103 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     updates[`players/${targetPlayerId}/activeEffects/${effectId}`] = {
       name: power ? power.name : 'Power',
       type: power ? power.type : 'help',
+      tier: power ? power.tier : 'common',
+      description: power ? power.description : '',
       from: playerId,
       appliedAt: Date.now()
     };
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
     showToast(`${power ? power.name : 'Power'} used${targetPlayerId === playerId ? ' on yourself' : ''}!`);
   }
+
+  // ---------- Player detail modal ----------
+  const playerModalOverlay = document.getElementById('playerModalOverlay');
+  const playerModalContent = document.getElementById('playerModalContent');
+  let openModalPlayerId = null;
+
+  function computePlayerStats(room, id){
+    const players = room.players || {};
+    const allEffects = [];
+    Object.entries(players).forEach(([pid, p]) => {
+      Object.values(p.activeEffects || {}).forEach(fx => allEffects.push({ targetId: pid, ...fx }));
+    });
+
+    const received = allEffects.filter(fx => fx.targetId === id).sort((a, b) => (b.appliedAt || 0) - (a.appliedAt || 0));
+    const given = allEffects.filter(fx => fx.from === id);
+
+    const receivedFromCounts = {};
+    received.forEach(fx => { receivedFromCounts[fx.from] = (receivedFromCounts[fx.from] || 0) + 1; });
+    let nemesisId = null, nemesisCount = 0;
+    Object.entries(receivedFromCounts).forEach(([pid, count]) => { if (count > nemesisCount) { nemesisCount = count; nemesisId = pid; } });
+
+    const givenToCounts = {};
+    given.forEach(fx => { givenToCounts[fx.targetId] = (givenToCounts[fx.targetId] || 0) + 1; });
+    let targetId = null, targetCount = 0;
+    Object.entries(givenToCounts).forEach(([pid, count]) => { if (count > targetCount) { targetCount = count; targetId = pid; } });
+
+    const scores = room.scores || {};
+    const myScores = [];
+    Object.values(scores).forEach(holeScores => { if (holeScores[id] != null) myScores.push(holeScores[id]); });
+    const holesPlayed = myScores.length;
+    const avgScore = holesPlayed ? (myScores.reduce((a, b) => a + b, 0) / holesPlayed).toFixed(1) : '—';
+    const bestHole = holesPlayed ? Math.min(...myScores) : '—';
+
+    return { received, givenCount: given.length, nemesisId, nemesisCount, targetId, targetCount, holesPlayed, avgScore, bestHole };
+  }
+
+  function openPlayerModal(room, id){
+    const p = room.players && room.players[id];
+    if (!p) return;
+    openModalPlayerId = id;
+    const stats = computePlayerStats(room, id);
+    const nemesisName = stats.nemesisId ? (room.players[stats.nemesisId]?.name || 'Someone') : null;
+    const targetName = stats.targetId ? (room.players[stats.targetId]?.name || 'Someone') : null;
+    const isClassic = !!(room.settings && room.settings.classicScoring);
+    const value = isClassic ? totalStrokes(room, id) : (p.points || 0);
+
+    playerModalContent.innerHTML = `
+      <div class="modal-header">
+        <div class="disc-chip">${p.avatar || '🥏'}</div>
+        <div>
+          <div class="modal-name">${p.name || 'Player'}${id === playerId ? ' (you)' : ''}</div>
+          <div class="modal-sub">${value}${isClassic ? ' strokes' : ' pts'} · ${room.hostId === id ? 'Host' : 'Player'}</div>
+        </div>
+      </div>
+
+      <div class="modal-section-title">Active powers received</div>
+      ${stats.received.length ? stats.received.map(fx => `
+        <div class="modal-power-row">
+          <span class="badge type-${fx.type}">${fx.type}</span>
+          <div class="info">
+            <strong>${fx.name}</strong>
+            <span>${fx.description || ''}${fx.from ? ` — from ${room.players[fx.from]?.name || 'someone'}` : ''}</span>
+          </div>
+        </div>
+      `).join('') : '<p class="modal-empty">No powers used on this player yet.</p>'}
+
+      <div class="modal-section-title">Round stats</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-value">${stats.holesPlayed}</div><div class="stat-label">Holes played</div></div>
+        <div class="stat-box"><div class="stat-value">${stats.avgScore}</div><div class="stat-label">Average score</div></div>
+        <div class="stat-box"><div class="stat-value">${stats.bestHole}</div><div class="stat-label">Best hole</div></div>
+        <div class="stat-box"><div class="stat-value">${stats.received.length}</div><div class="stat-label">Powers received</div></div>
+        <div class="stat-box"><div class="stat-value">${stats.givenCount}</div><div class="stat-label">Powers given</div></div>
+        <div class="stat-box"><div class="stat-value">${nemesisName || '—'}</div><div class="stat-label">Arch nemesis</div></div>
+      </div>
+      ${targetName ? `<p class="modal-empty">Favorite target: <strong>${targetName}</strong> (${stats.targetCount} power${stats.targetCount > 1 ? 's' : ''} sent their way)</p>` : ''}
+    `;
+    playerModalOverlay.hidden = false;
+  }
+
+  function closePlayerModal(){
+    playerModalOverlay.hidden = true;
+    openModalPlayerId = null;
+  }
+
+  document.getElementById('playerModalClose').addEventListener('click', closePlayerModal);
+  playerModalOverlay.addEventListener('click', (e) => {
+    if (e.target === playerModalOverlay) closePlayerModal();
+  });
 
   async function maybeResolveHole(code, room){
     if (room.hostId !== playerId) return; // only the host resolves, avoids double-writes
