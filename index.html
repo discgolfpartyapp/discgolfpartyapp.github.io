@@ -479,7 +479,7 @@
     display: flex;
     gap: 10px;
     overflow-x: auto;
-    padding: 6px 20px 10px;
+    padding: 22px 20px 10px;
     scrollbar-width: none;
   }
   .leaderboard::-webkit-scrollbar{ display:none; }
@@ -547,12 +547,12 @@
   .fx-icon-fire{ right: -6px; }
   .fx-icon-gloria{ left: -6px; }
   @keyframes fire-flicker{
-    0%, 100% { box-shadow: 0 0 10px 2px rgba(255,90,40,0.5), 0 0 0 2px var(--accent-coral); }
-    50% { box-shadow: 0 0 17px 5px rgba(255,120,40,0.75), 0 0 0 2px var(--accent-coral); }
+    0%, 100% { box-shadow: 0 0 8px 1px rgba(255,90,40,0.5), 0 0 0 2px var(--accent-coral); }
+    50% { box-shadow: 0 0 13px 3px rgba(255,120,40,0.75), 0 0 0 2px var(--accent-coral); }
   }
   @keyframes gloria-pulse{
-    0%, 100% { box-shadow: 0 0 10px 3px rgba(242,183,5,0.32), 0 0 0 2px var(--accent-gold); }
-    50% { box-shadow: 0 0 18px 6px rgba(242,183,5,0.55), 0 0 0 2px var(--accent-gold); }
+    0%, 100% { box-shadow: 0 0 8px 2px rgba(242,183,5,0.32), 0 0 0 2px var(--accent-gold); }
+    50% { box-shadow: 0 0 14px 4px rgba(242,183,5,0.55), 0 0 0 2px var(--accent-gold); }
   }
   .player-chip.fx-disrupt{ animation: fire-flicker 1.1s ease-in-out infinite; }
   .player-chip.fx-help{ animation: gloria-pulse 1.8s ease-in-out infinite; }
@@ -691,6 +691,27 @@
     font-size: 0.74rem;
     color: var(--ink-muted);
   }
+  .power-card.used-card{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-style: dashed;
+    cursor: default;
+    touch-action: auto;
+  }
+  .undo-btn{
+    align-self: flex-start;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--bg-elevated);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .undo-btn:active{ transform: scale(0.94); }
 
   /* ---------- Toast ---------- */
   .toast{
@@ -947,6 +968,7 @@
           <button id="scorePlus" type="button" aria-label="Increase score">+</button>
         </div>
         <button class="btn-primary" id="submitScore" type="button">Submit Score</button>
+        <button class="btn-ghost" id="editScoreBtn" type="button" hidden>Edit my score</button>
         <p class="waiting-note" id="scoreWaitingNote" hidden><span class="pulse"></span>Waiting on <span id="waitingNames"></span>…</p>
       </div>
 
@@ -1150,9 +1172,10 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     Object.entries(players).forEach(([id, p]) => {
       const row = document.createElement('div');
       row.className = 'lobby-player';
-      const tag = id === room.hostId ? 'Host' : (id === playerId ? 'You' : '');
+      const tagParts = [id === room.hostId ? 'Host' : (id === playerId ? 'You' : '')];
+      if (p.connected === false) tagParts.push('offline');
       row.innerHTML = `<div class="disc-chip">${p.avatar || '🥏'}</div>
-        <div><div class="name">${p.name || 'Player'}</div><div class="tag">${tag}</div></div>`;
+        <div><div class="name">${p.name || 'Player'}</div><div class="tag">${tagParts.filter(Boolean).join(' · ')}</div></div>`;
       lobbyPlayers.appendChild(row);
     });
 
@@ -1210,6 +1233,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
 
     const holes = selectedHoles || 9;
     const classicScoring = document.getElementById('classicScoreToggle').checked;
+    const name = usernameInput.value.trim();
 
     await set(ref(db, 'rooms/' + code), {
       hostId: playerId,
@@ -1217,12 +1241,13 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       currentHole: 1,
       settings: { holes, classicScoring },
       players: {
-        [playerId]: { name: usernameInput.value.trim(), avatar: selectedAvatar, points: 0, joinedAt: serverTimestamp() }
+        [playerId]: { name, avatar: selectedAvatar, points: 0, connected: true, joinedAt: serverTimestamp() }
       }
     });
 
-    // tidy up automatically if this device disconnects (closes tab, loses signal)
-    onDisconnect(ref(db, `rooms/${code}/players/${playerId}`)).remove();
+    // mark offline (not deleted) if this device disconnects — points/powers are preserved for rejoining
+    onDisconnect(ref(db, `rooms/${code}/players/${playerId}/connected`)).set(false);
+    saveSession(code, name, selectedAvatar);
 
     subscribeToRoom(code);
     startHostBtn.disabled = false;
@@ -1243,10 +1268,12 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       return;
     }
 
+    const name = usernameInput.value.trim();
     await update(ref(db, `rooms/${code}/players/${playerId}`), {
-      name: usernameInput.value.trim(), avatar: selectedAvatar, points: 0, joinedAt: serverTimestamp()
+      name, avatar: selectedAvatar, points: 0, connected: true, joinedAt: serverTimestamp()
     });
-    onDisconnect(ref(db, `rooms/${code}/players/${playerId}`)).remove();
+    onDisconnect(ref(db, `rooms/${code}/players/${playerId}/connected`)).set(false);
+    saveSession(code, name, selectedAvatar);
 
     subscribeToRoom(code);
     startJoinBtn.disabled = false;
@@ -1261,10 +1288,46 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     if (currentRoomCode) {
       await remove(ref(db, `rooms/${currentRoomCode}/players/${playerId}`));
       currentRoomCode = null;
+      clearSavedRoom();
     }
     stepLobby.hidden = true;
     stepMode.hidden = false;
   });
+
+  // ---------- Session persistence (survive refresh / reconnect after drop) ----------
+  function saveSession(code, name, avatar){
+    localStorage.setItem('dgp-room-code', code);
+    localStorage.setItem('dgp-username', name);
+    localStorage.setItem('dgp-avatar', avatar);
+  }
+  function clearSavedRoom(){
+    localStorage.removeItem('dgp-room-code');
+  }
+
+  async function attemptRejoin(){
+    const savedCode = localStorage.getItem('dgp-room-code');
+    if (!savedCode) return;
+
+    const snap = await get(ref(db, 'rooms/' + savedCode));
+    if (!snap.exists()) { clearSavedRoom(); return; }
+    const room = snap.val();
+    const existingPlayer = room.players && room.players[playerId];
+
+    if (existingPlayer) {
+      // still part of this room (maybe just marked offline) — reconnect without losing points/powers
+      await update(ref(db, `rooms/${savedCode}/players/${playerId}`), { connected: true });
+    } else {
+      // player node is gone entirely — rejoin fresh using the last known name/avatar, if we have them
+      const savedName = localStorage.getItem('dgp-username');
+      const savedAvatar = localStorage.getItem('dgp-avatar');
+      if (!savedName || !savedAvatar) { clearSavedRoom(); return; }
+      await update(ref(db, `rooms/${savedCode}/players/${playerId}`), {
+        name: savedName, avatar: savedAvatar, points: 0, connected: true, joinedAt: serverTimestamp()
+      });
+    }
+    onDisconnect(ref(db, `rooms/${savedCode}/players/${playerId}/connected`)).set(false);
+    subscribeToRoom(savedCode);
+  }
 
   // ---------- Toast ----------
   function showToast(msg){
@@ -1283,12 +1346,14 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   const holeLabel = document.getElementById('holeLabel');
   const scoreValueEl = document.getElementById('scoreValue');
   const submitScoreBtn = document.getElementById('submitScore');
+  const editScoreBtn = document.getElementById('editScoreBtn');
   const scoreWaitingNote = document.getElementById('scoreWaitingNote');
   const waitingNamesEl = document.getElementById('waitingNames');
   const powersTray = document.getElementById('powersTray');
 
   let scoreVal = 3;
   let lastRenderedHole = null;
+  let editingScore = false;
 
   document.getElementById('scoreMinus').addEventListener('click', () => {
     scoreVal = Math.max(1, scoreVal - 1);
@@ -1304,6 +1369,16 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const hole = latestRoom.currentHole || 1;
     submitScoreBtn.disabled = true;
     await update(ref(db, `rooms/${currentRoomCode}/scores/${hole}`), { [playerId]: scoreVal });
+    editingScore = false;
+  });
+
+  editScoreBtn.addEventListener('click', () => {
+    if (!latestRoom) return;
+    const hole = latestRoom.currentHole || 1;
+    const holeScores = (latestRoom.scores && latestRoom.scores[hole]) || {};
+    editingScore = true;
+    scoreVal = holeScores[playerId] != null ? holeScores[playerId] : scoreVal;
+    renderHole(currentRoomCode, latestRoom);
   });
 
   function totalStrokes(room, id){
@@ -1348,7 +1423,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
         ${hasActiveHelp ? '<span class="fx-icon fx-icon-gloria">✨</span>' : ''}
         <div class="disc-chip">${p.avatar || '🥏'}</div>
         <div class="chip-points">${value}${isClassic ? '' : ' pts'}</div>
-        <div class="chip-name">${p.name || 'Player'}${id === playerId ? ' (you)' : ''}</div>
+        <div class="chip-name">${p.name || 'Player'}${id === playerId ? ' (you)' : ''}${p.connected === false ? ' · offline' : ''}</div>
         ${previous.length ? `<div class="active-effects">${previous.map(() => '<span class="effect-dot past"></span>').join('')}</div>` : ''}
       `;
       chip.addEventListener('click', () => openPlayerModal(room, id));
@@ -1366,6 +1441,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     if (hole !== lastRenderedHole) {
       scoreVal = 3;
       lastRenderedHole = hole;
+      editingScore = false;
     }
     const totalHoles = (room.settings && room.settings.holes) || 9;
     holeLabel.textContent = `Hole ${hole} of ${totalHoles}`;
@@ -1373,12 +1449,14 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const holeScores = (room.scores && room.scores[hole]) || {};
     const mySubmittedScore = holeScores[playerId];
     const submitted = mySubmittedScore !== undefined;
+    const locked = submitted && !editingScore;
 
-    scoreValueEl.textContent = submitted ? mySubmittedScore : scoreVal;
-    submitScoreBtn.textContent = submitted ? 'Score Submitted ✓' : 'Submit Score';
-    submitScoreBtn.disabled = submitted;
-    document.getElementById('scoreMinus').disabled = submitted;
-    document.getElementById('scorePlus').disabled = submitted;
+    scoreValueEl.textContent = locked ? mySubmittedScore : scoreVal;
+    submitScoreBtn.textContent = locked ? 'Score Submitted ✓' : (submitted ? 'Update Score' : 'Submit Score');
+    submitScoreBtn.disabled = locked;
+    document.getElementById('scoreMinus').disabled = locked;
+    document.getElementById('scorePlus').disabled = locked;
+    editScoreBtn.hidden = !locked;
 
     const players = room.players || {};
     const waiting = Object.entries(players)
@@ -1434,15 +1512,48 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       });
       powersTray.appendChild(card);
     });
-    const emptySlots = Math.max(0, 3 - myPowers.length);
+
+    const currentHole = room.currentHole || 1;
+    const lastUse = me && me.lastPowerUse;
+    const showUndo = lastUse && lastUse.hole === currentHole;
+
+    if (showUndo) {
+      const targetName = (room.players[lastUse.targetPlayerId] && room.players[lastUse.targetPlayerId].name) || 'them';
+      const usedPower = getPower(lastUse.powerId);
+      const usedCard = document.createElement('div');
+      usedCard.className = 'power-card used-card';
+      usedCard.innerHTML = `
+        <div class="power-tier">used this hole</div>
+        <div class="power-name">${usedPower ? usedPower.name : 'Power'}</div>
+        <div class="power-desc">Sent to ${targetName}${lastUse.targetPlayerId === playerId ? ' (yourself)' : ''}</div>
+        <button class="undo-btn" type="button">↺ Undo</button>
+      `;
+      usedCard.querySelector('.undo-btn').addEventListener('click', undoLastPower);
+      powersTray.appendChild(usedCard);
+    }
+
+    const emptySlots = Math.max(0, 3 - myPowers.length - (showUndo ? 1 : 0));
     for (let i = 0; i < emptySlots; i++){
       const slot = document.createElement('div');
       slot.className = 'powers-empty-slot';
-      slot.textContent = myPowers.length === 0 && i === 0
+      slot.textContent = myPowers.length === 0 && i === 0 && !showUndo
         ? 'No powers yet — win a hole and everyone else gets one'
         : 'Empty slot';
       powersTray.appendChild(slot);
     }
+  }
+
+  async function undoLastPower(){
+    if (!currentRoomCode || !latestRoom) return;
+    const me = latestRoom.players && latestRoom.players[playerId];
+    const last = me && me.lastPowerUse;
+    if (!last) return;
+    const updates = {};
+    updates[`players/${playerId}/powers/${last.instanceId}`] = last.powerId;
+    updates[`players/${last.targetPlayerId}/activeEffects/${last.effectId}`] = null;
+    updates[`players/${playerId}/lastPowerUse`] = null;
+    await update(ref(db, `rooms/${currentRoomCode}`), updates);
+    showToast('Power undone.');
   }
 
   // ---------- Custom pointer-based drag & drop (works on touch + mouse) ----------
@@ -1529,6 +1640,9 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       from: playerId,
       appliedAt: Date.now(),
       appliedOnHole: activeHole
+    };
+    updates[`players/${playerId}/lastPowerUse`] = {
+      instanceId, powerId, effectId, targetPlayerId, hole: activeHole
     };
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
     showToast(`${power ? power.name : 'Power'} used${targetPlayerId === playerId ? ' on yourself' : ''} — active for this hole!`);
@@ -1707,6 +1821,8 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       maybeResolveHole(code, room);
     }
   }
+
+  attemptRejoin();
 })();
 </script>
 </body>
