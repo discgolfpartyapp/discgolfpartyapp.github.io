@@ -398,6 +398,12 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-coral) 22%, transparent);
   }
 
+  .join-error{
+    margin: -6px 0 0;
+    font-size: 0.82rem;
+    color: var(--accent-coral);
+  }
+
   .room-display{
     text-align:center;
     padding: 18px 10px;
@@ -561,6 +567,7 @@
             <input class="code-cell" maxlength="1" inputmode="text">
           </div>
         </div>
+        <p class="join-error" id="joinError" hidden>Can't find a room with that code.</p>
         <button class="btn-primary" id="startJoin" disabled type="button">Join Lobby</button>
       </div>
 
@@ -585,7 +592,27 @@
   <footer>Prototype build — running locally via GitHub Pages</footer>
 </div>
 
-<script>
+<script type="module">
+import { firebaseConfig } from './firebase-config.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
+import {
+  getDatabase, ref, set, get, update, remove, onValue, onDisconnect, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js';
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ---------- Player identity (persisted per device, not per account) ----------
+function getPlayerId(){
+  let id = localStorage.getItem('dgp-player-id');
+  if (!id) {
+    id = 'p-' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('dgp-player-id', id);
+  }
+  return id;
+}
+const playerId = getPlayerId();
+
 (function(){
   // ---------- Theme ----------
   const root = document.documentElement;
@@ -691,16 +718,21 @@
     return word + '-' + num;
   }
   document.getElementById('generatedCode').textContent = generateCode();
+  tabHost.addEventListener('click', () => {
+    document.getElementById('generatedCode').textContent = generateCode();
+  });
 
   // ---------- Join code cells ----------
   const codeCells = Array.from(document.querySelectorAll('.code-cell'));
   const startJoinBtn = document.getElementById('startJoin');
+  const joinError = document.getElementById('joinError');
   function checkCodeComplete(){
     startJoinBtn.disabled = !codeCells.every(c => c.value.trim().length === 1);
   }
   codeCells.forEach((cell, idx) => {
     cell.addEventListener('input', () => {
       cell.value = cell.value.toUpperCase().slice(-1);
+      joinError.hidden = true;
       if (cell.value && idx < codeCells.length - 1) codeCells[idx + 1].focus();
       checkCodeComplete();
     });
@@ -709,36 +741,117 @@
     });
   });
 
-  // ---------- Lobby ----------
+  // ---------- Lobby state ----------
   const lobbyPlayers = document.getElementById('lobbyPlayers');
   const lobbyTitle = document.getElementById('lobbyTitle');
   const lobbySub = document.getElementById('lobbySub');
+  const startHostBtn = document.getElementById('startHost');
 
-  function renderLobby(mode){
+  let currentRoomCode = null;
+  let stopListening = null;
+
+  function renderLobby(code, room){
     lobbyPlayers.innerHTML = '';
-    const player = document.createElement('div');
-    player.className = 'lobby-player';
-    player.innerHTML = `<div class="disc-chip">${selectedAvatar}</div>
-      <div><div class="name">${usernameInput.value.trim()}</div><div class="tag">${mode === 'host' ? 'Host' : 'You'}</div></div>`;
-    lobbyPlayers.appendChild(player);
+    const players = room.players || {};
+    Object.entries(players).forEach(([id, p]) => {
+      const row = document.createElement('div');
+      row.className = 'lobby-player';
+      const tag = id === room.hostId ? 'Host' : (id === playerId ? 'You' : '');
+      row.innerHTML = `<div class="disc-chip">${p.avatar || '🥏'}</div>
+        <div><div class="name">${p.name || 'Player'}</div><div class="tag">${tag}</div></div>`;
+      lobbyPlayers.appendChild(row);
+    });
 
-    if (mode === 'host') {
-      lobbyTitle.textContent = 'Room ' + document.getElementById('generatedCode').textContent;
-      lobbySub.textContent = (selectedHoles || '—') + ' holes · ' +
-        (document.getElementById('classicScoreToggle').checked ? 'Classic scoring' : 'Party points') +
-        ' · share the code above to bring friends in';
-    } else {
-      const code = codeCells.map(c => c.value).join('');
-      lobbyTitle.textContent = 'Joined ' + code;
-      lobbySub.textContent = 'Sit tight — the host will start the round shortly.';
-    }
+    const isHost = room.hostId === playerId;
+    const s = room.settings || {};
+    lobbyTitle.textContent = (isHost ? 'Room ' : 'Joined ') + code;
+    lobbySub.textContent = (s.holes || '—') + ' holes · ' +
+      (s.classicScoring ? 'Classic scoring' : 'Party points') +
+      (isHost ? ' · share the code above to bring friends in' : ' · sit tight — the host will start the round shortly');
+  }
 
+  function subscribeToRoom(code){
+    if (stopListening) stopListening();
+    stopListening = onValue(ref(db, 'rooms/' + code), (snapshot) => {
+      const room = snapshot.val();
+      if (!room) return; // room was removed
+      renderLobby(code, room);
+    });
+    currentRoomCode = code;
     stepMode.hidden = true;
     stepLobby.hidden = false;
   }
 
-  document.getElementById('startHost').addEventListener('click', () => renderLobby('host'));
-  startJoinBtn.addEventListener('click', () => renderLobby('join'));
+  async function createRoom(){
+    startHostBtn.disabled = true;
+    startHostBtn.textContent = 'Creating…';
+
+    let code = document.getElementById('generatedCode').textContent;
+    // avoid clobbering a code that's already taken
+    for (let i = 0; i < 5; i++){
+      const snap = await get(ref(db, 'rooms/' + code));
+      if (!snap.exists()) break;
+      code = generateCode();
+      document.getElementById('generatedCode').textContent = code;
+    }
+
+    const holes = selectedHoles || 9;
+    const classicScoring = document.getElementById('classicScoreToggle').checked;
+
+    await set(ref(db, 'rooms/' + code), {
+      hostId: playerId,
+      createdAt: serverTimestamp(),
+      currentHole: 1,
+      settings: { holes, classicScoring },
+      players: {
+        [playerId]: { name: usernameInput.value.trim(), avatar: selectedAvatar, points: 0, joinedAt: serverTimestamp() }
+      }
+    });
+
+    // tidy up automatically if this device disconnects (closes tab, loses signal)
+    onDisconnect(ref(db, `rooms/${code}/players/${playerId}`)).remove();
+
+    subscribeToRoom(code);
+    startHostBtn.disabled = false;
+    startHostBtn.textContent = 'Create Lobby';
+  }
+
+  async function joinRoom(){
+    const code = codeCells.map(c => c.value).join('').toUpperCase();
+    startJoinBtn.disabled = true;
+    startJoinBtn.textContent = 'Joining…';
+    joinError.hidden = true;
+
+    const snap = await get(ref(db, 'rooms/' + code));
+    if (!snap.exists()) {
+      joinError.hidden = false;
+      startJoinBtn.disabled = false;
+      startJoinBtn.textContent = 'Join Lobby';
+      return;
+    }
+
+    await update(ref(db, `rooms/${code}/players/${playerId}`), {
+      name: usernameInput.value.trim(), avatar: selectedAvatar, points: 0, joinedAt: serverTimestamp()
+    });
+    onDisconnect(ref(db, `rooms/${code}/players/${playerId}`)).remove();
+
+    subscribeToRoom(code);
+    startJoinBtn.disabled = false;
+    startJoinBtn.textContent = 'Join Lobby';
+  }
+
+  startHostBtn.addEventListener('click', createRoom);
+  startJoinBtn.addEventListener('click', joinRoom);
+
+  document.getElementById('backTo2').addEventListener('click', async () => {
+    if (stopListening) { stopListening(); stopListening = null; }
+    if (currentRoomCode) {
+      await remove(ref(db, `rooms/${currentRoomCode}/players/${playerId}`));
+      currentRoomCode = null;
+    }
+    stepLobby.hidden = true;
+    stepMode.hidden = false;
+  });
 })();
 </script>
 </body>
