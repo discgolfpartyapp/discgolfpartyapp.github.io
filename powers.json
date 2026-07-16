@@ -1,0 +1,114 @@
+[
+  {
+    "id": "mulligan",
+    "type": "help",
+    "tier": "common",
+    "name": "Mulligan",
+    "description": "Re-throw your next shot and take whichever result you like better."
+  },
+  {
+    "id": "gimme-putt",
+    "type": "help",
+    "tier": "common",
+    "name": "Gimme Putt",
+    "description": "Any putt inside 10 feet on your next hole counts as made."
+  },
+  {
+    "id": "practice-stroke",
+    "type": "help",
+    "tier": "common",
+    "name": "Practice Stroke",
+    "description": "Take one practice throw before your real shot next hole — no penalty."
+  },
+  {
+    "id": "second-wind",
+    "type": "help",
+    "tier": "rare",
+    "name": "Second Wind",
+    "description": "Your worst throw of the next hole doesn't count against your score."
+  },
+  {
+    "id": "home-turf",
+    "type": "help",
+    "tier": "rare",
+    "name": "Home Turf",
+    "description": "You choose your own tee position on your next hole."
+  },
+  {
+    "id": "phoenix-round",
+    "type": "help",
+    "tier": "legendary",
+    "name": "Phoenix Round",
+    "description": "Erase your worst hole score of the round so far and replace it with par."
+  },
+  {
+    "id": "untouchable",
+    "type": "help",
+    "tier": "legendary",
+    "name": "Untouchable",
+    "description": "You're immune to the next disrupt power thrown at you. Shrug it off."
+  },
+  {
+    "id": "off-hand-only",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Off-Hand Only",
+    "description": "Target must throw their next shot with their non-dominant hand."
+  },
+  {
+    "id": "no-run-up",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "No Run-Up",
+    "description": "Target must throw their next shot from a dead standstill."
+  },
+  {
+    "id": "silent-treatment",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Silent Treatment",
+    "description": "Target can't ask anyone for advice or a line read on their next throw."
+  },
+  {
+    "id": "switch-discs",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Switch Discs",
+    "description": "Target must throw their next shot with a disc you pick from their bag."
+  },
+  {
+    "id": "blindfold-toss",
+    "type": "disrupt",
+    "tier": "rare",
+    "name": "Blindfold Toss",
+    "description": "Target throws one shot blindfolded, with a spotter allowed to point only."
+  },
+  {
+    "id": "opposite-hand-putt",
+    "type": "disrupt",
+    "tier": "rare",
+    "name": "Opposite Hand Putt",
+    "description": "Target's next putt must be thrown with their non-dominant hand."
+  },
+  {
+    "id": "sit-down-throw",
+    "type": "disrupt",
+    "tier": "rare",
+    "name": "Sit-Down Throw",
+    "description": "Target must throw their next shot from a seated position."
+  },
+  {
+    "id": "backwards-tee",
+    "type": "disrupt",
+    "tier": "legendary",
+    "name": "Backwards Tee",
+    "description": "Target tees off facing away from the basket and must turn to throw."
+  },
+  {
+    "id": "bag-check",
+    "type": "disrupt",
+    "tier": "legendary",
+    "name": "Bag Check",
+    "description": "Target leaves their bag at the tee and plays the whole hole with one disc."
+  }
+]
