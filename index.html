@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Disc Golf Party</title>
+<meta name="description" content="A disc golf scoring app with powers, chaos, and a party in every round.">
+<meta name="theme-color" content="#0F1B14">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+
+  /* ---------- Tokens ---------- */
+  :root{
+    color-scheme: light;
+    --bg: #EEF3EA;
+    --bg-elevated: #FFFFFF;
+    --surface: #E2ECE0;
+    --ink: #10241A;
+    --ink-muted: #52685B;
+    --accent-teal: #12967F;
+    --accent-teal-ink: #ffffff;
+    --accent-gold: #A66E00;
+    --accent-coral: #C63F3F;
+    --border: rgba(16,36,26,0.14);
+    --border-strong: rgba(16,36,26,0.26);
+    --shadow-color: 16,36,26;
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg: #0F1B14;
+    --bg-elevated: #16261C;
+    --surface: #1C2F23;
+    --ink: #F2F7F0;
+    --ink-muted: #A6BBAC;
+    --accent-teal: #2DD4A7;
+    --accent-teal-ink: #06231A;
+    --accent-gold: #F2B705;
+    --accent-coral: #FF7A6E;
+    --border: rgba(242,247,240,0.12);
+    --border-strong: rgba(242,247,240,0.22);
+    --shadow-color: 0,0,0;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 1px 1px, rgba(var(--shadow-color),0.10) 1px, transparent 0) 0 0/22px 22px,
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color .25s ease, color .25s ease;
+  }
+
+  .app-shell{
+    max-width: 460px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    backdrop-filter: blur(10px);
+    background: linear-gradient(to bottom, rgba(var(--shadow-color),0.06), transparent);
+  }
+  .wordmark{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+  }
+  .wordmark span{ color: var(--accent-teal); }
+
+  .theme-toggle{
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    background: var(--bg-elevated);
+    display:flex; align-items:center; justify-content:center;
+    cursor: pointer;
+    color: var(--ink);
+    transition: transform .2s ease, border-color .2s ease;
+  }
+  .theme-toggle:active{ transform: scale(0.9) rotate(20deg); }
+  .theme-toggle svg{ width: 20px; height: 20px; }
+  .theme-toggle .sun{ display:none; }
+  html[data-theme="dark"] .theme-toggle .sun{ display:block; }
+  html[data-theme="dark"] .theme-toggle .moon{ display:none; }
+
+  main{
+    flex: 1;
+    padding: 4px 20px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    text-align:center;
+    padding: 10px 4px 6px;
+  }
+  .hero-graphic{
+    width: 168px;
+    height: 168px;
+    margin: 0 auto 10px;
+    display:block;
+  }
+  .disc-teal{ fill: var(--accent-teal); }
+  .disc-gold{ fill: var(--accent-gold); }
+  .disc-coral{ fill: var(--accent-coral); }
+  .flight-line{
+    fill:none;
+    stroke: var(--border-strong);
+    stroke-width: 2;
+    stroke-dasharray: 4 7;
+    stroke-linecap: round;
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .disc-a{ animation: drift-a 7s ease-in-out infinite; transform-origin: 84px 78px; }
+    .disc-b{ animation: drift-b 8s ease-in-out infinite; transform-origin: 110px 100px; }
+    .disc-c{ animation: drift-c 6.5s ease-in-out infinite; transform-origin: 60px 108px; }
+  }
+  @keyframes drift-a{ 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(-4px) rotate(3deg);} }
+  @keyframes drift-b{ 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(3px) rotate(-4deg);} }
+  @keyframes drift-c{ 0%,100%{ transform: translateY(0) rotate(0deg);} 50%{ transform: translateY(-3px) rotate(-2deg);} }
+
+  h1{
+    font-family: var(--font-display);
+    font-size: 1.7rem;
+    line-height: 1.15;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .hero p{
+    margin: 0;
+    color: var(--ink-muted);
+    font-size: 0.96rem;
+    line-height: 1.5;
+    padding: 0 12px;
+  }
+
+  /* ---------- Cards / Steps ---------- */
+  .card{
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 22px 20px 20px;
+    box-shadow: 0 1px 2px rgba(var(--shadow-color),0.06), 0 10px 30px -18px rgba(var(--shadow-color),0.35);
+  }
+  .card h2{
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    margin: 0 0 4px;
+  }
+  .card .sub{
+    color: var(--ink-muted);
+    font-size: 0.86rem;
+    margin: 0 0 16px;
+  }
+  .step-eyebrow{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  .step-eyebrow .dot{
+    width:6px;height:6px;border-radius:50%;
+    background: var(--accent-teal);
+  }
+
+  label{
+    display:block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--ink-muted);
+  }
+
+  input[type="text"], input[type="number"]{
+    width: 100%;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    padding: 13px 15px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type="text"]:focus, input[type="number"]:focus{
+    border-color: var(--accent-teal);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-teal) 25%, transparent);
+  }
+
+  /* ---------- Avatar picker (signature disc-chip) ---------- */
+  .avatar-grid{
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin: 16px 0 20px;
+  }
+  .disc-chip{
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 1.25rem;
+    background: radial-gradient(circle at 32% 28%, var(--bg-elevated), var(--surface) 72%);
+    box-shadow:
+      inset 0 2px 3px rgba(255,255,255,0.35),
+      inset 0 -4px 7px rgba(var(--shadow-color),0.28),
+      0 0 0 1.5px var(--border);
+    transition: transform .15s ease, box-shadow .15s ease;
+    padding: 0;
+  }
+  .disc-chip:active{ transform: scale(0.92) rotate(10deg); }
+  .disc-chip.selected{
+    box-shadow:
+      inset 0 2px 3px rgba(255,255,255,0.35),
+      inset 0 -4px 7px rgba(var(--shadow-color),0.28),
+      0 0 0 2.5px var(--accent-teal);
+    transform: translateY(-2px);
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn-primary, .btn-ghost{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.96rem;
+    border-radius: 999px;
+    padding: 14px 22px;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    transition: transform .18s cubic-bezier(.2,.9,.3,1.3), box-shadow .18s ease, opacity .15s ease;
+  }
+  .btn-primary{
+    background: var(--accent-teal);
+    color: var(--accent-teal-ink);
+    box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--accent-teal) 70%, transparent);
+  }
+  .btn-primary:disabled{ opacity: 0.45; cursor: not-allowed; }
+  .btn-primary:not(:disabled):hover{ transform: translateY(-2px) rotate(-1deg); }
+  .btn-primary:not(:disabled):active{ transform: translateY(0) rotate(0deg) scale(0.98); }
+
+  .btn-ghost{
+    background: transparent;
+    color: var(--ink-muted);
+    border: 1.5px solid var(--border-strong);
+    margin-top: 10px;
+  }
+  .btn-ghost:hover{ color: var(--ink); border-color: var(--ink-muted); }
+
+  /* ---------- Mode tabs ---------- */
+  .mode-tabs{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .disc-tab{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 14px 8px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .disc-tab.active{
+    background: var(--accent-teal);
+    border-color: var(--accent-teal);
+    color: var(--accent-teal-ink);
+  }
+
+  .panel{ display: flex; flex-direction: column; gap: 18px; }
+
+  /* ---------- Holes selector ---------- */
+  .pill-group{
+    display: flex;
+    gap: 8px;
+  }
+  .pill-option{
+    flex:1;
+    text-align:center;
+    padding: 12px 6px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink-muted);
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .pill-option.active{
+    background: var(--accent-gold);
+    border-color: var(--accent-gold);
+    color: #241800;
+  }
+  html[data-theme="dark"] .pill-option.active{ color: #241800; }
+  .custom-holes{ margin-top: 10px; display:none; }
+  .custom-holes.visible{ display:block; }
+
+  /* ---------- Toggle switch (scoring mode) ---------- */
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+  }
+  .toggle-row .label-block strong{ display:block; font-size:0.9rem; }
+  .toggle-row .label-block span{ font-size: 0.78rem; color: var(--ink-muted); }
+  .switch{
+    position: relative;
+    width: 46px; height: 27px;
+    flex-shrink: 0;
+  }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch .track{
+    position:absolute; inset:0;
+    background: var(--border-strong);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background .2s ease;
+  }
+  .switch .track::before{
+    content:"";
+    position:absolute;
+    width: 21px; height: 21px;
+    left: 3px; top: 3px;
+    background: var(--bg-elevated);
+    border-radius: 50%;
+    transition: transform .2s ease;
+    box-shadow: 0 1px 3px rgba(var(--shadow-color),0.4);
+  }
+  .switch input:checked + .track{ background: var(--accent-teal); }
+  .switch input:checked + .track::before{ transform: translateX(19px); }
+
+  /* ---------- Room code chips ---------- */
+  .code-row{
+    display:flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+  .code-cell{
+    width: 46px; height: 54px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    text-align:center;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 1.2rem;
+    color: var(--ink);
+    text-transform: uppercase;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .code-cell:focus{
+    border-color: var(--accent-coral);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-coral) 22%, transparent);
+  }
+
+  .room-display{
+    text-align:center;
+    padding: 18px 10px;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1.5px dashed var(--border-strong);
+  }
+  .room-display .code{
+    font-family: var(--font-mono);
+    font-size: 1.9rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: var(--accent-teal);
+  }
+  .room-display .hint{
+    font-size: 0.78rem;
+    color: var(--ink-muted);
+    margin-top: 4px;
+  }
+
+  /* ---------- Lobby ---------- */
+  .lobby-players{
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+    margin: 16px 0 18px;
+  }
+  .lobby-player{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+  }
+  .lobby-player .disc-chip{ width:40px; height:40px; font-size: 1.05rem; flex-shrink:0; }
+  .lobby-player .name{ font-weight: 600; font-size: 0.92rem; }
+  .lobby-player .tag{ font-size: 0.74rem; color: var(--ink-muted); }
+  .waiting-note{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    color: var(--ink-muted);
+    font-size: 0.82rem;
+    padding: 10px 0 4px;
+  }
+  .pulse{
+    width: 7px; height:7px; border-radius:50%;
+    background: var(--accent-coral);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{ opacity: 1; } 50%{ opacity: 0.25; } }
+
+  footer{
+    text-align:center;
+    padding: 6px 20px 26px;
+    font-size: 0.74rem;
+    color: var(--ink-muted);
+  }
+
+  [hidden]{ display:none !important; }
+
+  @media (min-width: 460px){
+    body{ padding: 24px 0; }
+    .app-shell{ border-radius: 32px; overflow: hidden; box-shadow: 0 30px 80px -30px rgba(0,0,0,0.35); min-height: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar">
+    <div class="wordmark">DISC GOLF <span>PARTY</span></div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" type="button">
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.6A9 9 0 1 1 11.4 3 7 7 0 0 0 21 12.6Z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </header>
+
+  <main>
+
+    <section class="hero" id="heroSection">
+      <svg class="hero-graphic" viewBox="0 0 168 168" aria-hidden="true">
+        <path class="flight-line" d="M20 30 C 60 10, 90 20, 120 45 S 150 90, 130 120"/>
+        <g class="disc-a"><ellipse class="disc-teal" cx="84" cy="78" rx="34" ry="15"/><ellipse cx="84" cy="74" rx="34" ry="15" fill="rgba(255,255,255,0.18)"/></g>
+        <g class="disc-b"><ellipse class="disc-gold" cx="110" cy="100" rx="24" ry="10.5"/></g>
+        <g class="disc-c"><ellipse class="disc-coral" cx="55" cy="112" rx="20" ry="9"/></g>
+      </svg>
+      <h1>Score less.<br>Party more.</h1>
+      <p>Disc golf scoring with powers, chaos, and a lead that never feels safe.</p>
+    </section>
+
+    <!-- STEP 1: Identity -->
+    <section class="card step" id="stepIdentity">
+      <div class="step-eyebrow"><span class="dot"></span>Step 1 of 2</div>
+      <h2>Who's throwing?</h2>
+      <p class="sub">Pick a name for this round. Nothing's saved anywhere but this device.</p>
+
+      <label for="usernameInput">Player name</label>
+      <input type="text" id="usernameInput" maxlength="16" placeholder="e.g. Chain Reaction" autocomplete="off">
+
+      <label style="margin-top:16px;">Choose an avatar</label>
+      <div class="avatar-grid" id="avatarGrid"></div>
+
+      <button class="btn-primary" id="toStep2" disabled type="button">Next</button>
+    </section>
+
+    <!-- STEP 2: Host or Join -->
+    <section class="card step" id="stepMode" hidden>
+      <div class="step-eyebrow"><span class="dot"></span>Step 2 of 2</div>
+      <h2>Host or join?</h2>
+      <p class="sub">Hosting runs the game from this device. Joining connects with a room code.</p>
+
+      <div class="mode-tabs">
+        <button class="disc-tab active" id="tabHost" type="button">Host a Game</button>
+        <button class="disc-tab" id="tabJoin" type="button">Join a Game</button>
+      </div>
+
+      <!-- Host panel -->
+      <div class="panel" id="hostPanel">
+        <div>
+          <label>Number of holes</label>
+          <div class="pill-group" id="holesGroup">
+            <div class="pill-option active" data-holes="9">9</div>
+            <div class="pill-option" data-holes="18">18</div>
+            <div class="pill-option" data-holes="custom">Custom</div>
+          </div>
+          <div class="custom-holes" id="customHolesWrap">
+            <input type="number" id="customHolesInput" min="1" max="27" placeholder="Number of holes">
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="label-block">
+            <strong>Classic golf scoring</strong>
+            <span>Off uses party points instead</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="classicScoreToggle">
+            <span class="track"></span>
+          </label>
+        </div>
+
+        <div class="room-display">
+          <div class="code" id="generatedCode">ACE-42</div>
+          <div class="hint">Your room code — share it with the group</div>
+        </div>
+
+        <button class="btn-primary" id="startHost" type="button">Create Lobby</button>
+      </div>
+
+      <!-- Join panel -->
+      <div class="panel" id="joinPanel" hidden>
+        <div>
+          <label>Enter room code</label>
+          <div class="code-row" id="codeRow">
+            <input class="code-cell" maxlength="1" inputmode="text">
+            <input class="code-cell" maxlength="1" inputmode="text">
+            <input class="code-cell" maxlength="1" inputmode="text">
+            <input class="code-cell" maxlength="1" inputmode="text">
+          </div>
+        </div>
+        <button class="btn-primary" id="startJoin" disabled type="button">Join Lobby</button>
+      </div>
+
+      <button class="btn-ghost" id="backTo1" type="button">← Back</button>
+    </section>
+
+    <!-- STEP 3: Lobby placeholder -->
+    <section class="card step" id="stepLobby" hidden>
+      <div class="step-eyebrow"><span class="dot"></span>Lobby</div>
+      <h2 id="lobbyTitle">Waiting room</h2>
+      <p class="sub" id="lobbySub">Everything else — scoring, holes, and powers — picks up from here.</p>
+
+      <div class="lobby-players" id="lobbyPlayers"></div>
+
+      <div class="waiting-note"><span class="pulse"></span>Waiting for more players to join…</div>
+
+      <button class="btn-ghost" id="backTo2" type="button">← Back</button>
+    </section>
+
+  </main>
+
+  <footer>Prototype build — running locally via GitHub Pages</footer>
+</div>
+
+<script>
+(function(){
+  // ---------- Theme ----------
+  const root = document.documentElement;
+  const themeToggle = document.getElementById('themeToggle');
+  const savedTheme = localStorage.getItem('dgp-theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  root.setAttribute('data-theme', savedTheme || (prefersDark ? 'dark' : 'light'));
+
+  themeToggle.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('dgp-theme', next);
+  });
+
+  // ---------- Avatar picker ----------
+  const avatars = ['🥏','🏆','🔥','⚡️','🎯','🌪️','🍀','👑','🦄','🐝','🐉','🌵'];
+  const avatarGrid = document.getElementById('avatarGrid');
+  let selectedAvatar = null;
+  avatars.forEach((emoji, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'disc-chip';
+    btn.textContent = emoji;
+    btn.setAttribute('aria-label', 'Avatar ' + emoji);
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.disc-chip.selected').forEach(el => el.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedAvatar = emoji;
+      validateStep1();
+    });
+    avatarGrid.appendChild(btn);
+    if (i === 0) { btn.classList.add('selected'); selectedAvatar = emoji; }
+  });
+
+  // ---------- Step 1 -> 2 ----------
+  const usernameInput = document.getElementById('usernameInput');
+  const toStep2Btn = document.getElementById('toStep2');
+  const stepIdentity = document.getElementById('stepIdentity');
+  const stepMode = document.getElementById('stepMode');
+  const stepLobby = document.getElementById('stepLobby');
+  const heroSection = document.getElementById('heroSection');
+
+  function validateStep1(){
+    toStep2Btn.disabled = usernameInput.value.trim().length === 0 || !selectedAvatar;
+  }
+  usernameInput.addEventListener('input', validateStep1);
+
+  toStep2Btn.addEventListener('click', () => {
+    stepIdentity.hidden = true;
+    stepMode.hidden = false;
+  });
+  document.getElementById('backTo1').addEventListener('click', () => {
+    stepMode.hidden = true;
+    stepIdentity.hidden = false;
+  });
+  document.getElementById('backTo2').addEventListener('click', () => {
+    stepLobby.hidden = true;
+    stepMode.hidden = false;
+  });
+
+  // ---------- Host / Join tabs ----------
+  const tabHost = document.getElementById('tabHost');
+  const tabJoin = document.getElementById('tabJoin');
+  const hostPanel = document.getElementById('hostPanel');
+  const joinPanel = document.getElementById('joinPanel');
+
+  tabHost.addEventListener('click', () => {
+    tabHost.classList.add('active'); tabJoin.classList.remove('active');
+    hostPanel.hidden = false; joinPanel.hidden = true;
+  });
+  tabJoin.addEventListener('click', () => {
+    tabJoin.classList.add('active'); tabHost.classList.remove('active');
+    joinPanel.hidden = false; hostPanel.hidden = true;
+  });
+
+  // ---------- Holes selector ----------
+  const holesGroup = document.getElementById('holesGroup');
+  const customWrap = document.getElementById('customHolesWrap');
+  let selectedHoles = 9;
+  holesGroup.querySelectorAll('.pill-option').forEach(pill => {
+    pill.addEventListener('click', () => {
+      holesGroup.querySelectorAll('.pill-option').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const val = pill.dataset.holes;
+      if (val === 'custom') {
+        customWrap.classList.add('visible');
+        selectedHoles = document.getElementById('customHolesInput').value || null;
+      } else {
+        customWrap.classList.remove('visible');
+        selectedHoles = parseInt(val, 10);
+      }
+    });
+  });
+  document.getElementById('customHolesInput').addEventListener('input', (e) => {
+    selectedHoles = parseInt(e.target.value, 10) || null;
+  });
+
+  // ---------- Room code generation ----------
+  const words = ['ACE','BIRDIE','CHAINS','MULLIGAN','ALBATROSS','TEEBOX','ROLLER','SPIKE'];
+  function generateCode(){
+    const word = words[Math.floor(Math.random() * words.length)];
+    const num = Math.floor(10 + Math.random() * 89);
+    return word + '-' + num;
+  }
+  document.getElementById('generatedCode').textContent = generateCode();
+
+  // ---------- Join code cells ----------
+  const codeCells = Array.from(document.querySelectorAll('.code-cell'));
+  const startJoinBtn = document.getElementById('startJoin');
+  function checkCodeComplete(){
+    startJoinBtn.disabled = !codeCells.every(c => c.value.trim().length === 1);
+  }
+  codeCells.forEach((cell, idx) => {
+    cell.addEventListener('input', () => {
+      cell.value = cell.value.toUpperCase().slice(-1);
+      if (cell.value && idx < codeCells.length - 1) codeCells[idx + 1].focus();
+      checkCodeComplete();
+    });
+    cell.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !cell.value && idx > 0) codeCells[idx - 1].focus();
+    });
+  });
+
+  // ---------- Lobby ----------
+  const lobbyPlayers = document.getElementById('lobbyPlayers');
+  const lobbyTitle = document.getElementById('lobbyTitle');
+  const lobbySub = document.getElementById('lobbySub');
+
+  function renderLobby(mode){
+    lobbyPlayers.innerHTML = '';
+    const player = document.createElement('div');
+    player.className = 'lobby-player';
+    player.innerHTML = `<div class="disc-chip">${selectedAvatar}</div>
+      <div><div class="name">${usernameInput.value.trim()}</div><div class="tag">${mode === 'host' ? 'Host' : 'You'}</div></div>`;
+    lobbyPlayers.appendChild(player);
+
+    if (mode === 'host') {
+      lobbyTitle.textContent = 'Room ' + document.getElementById('generatedCode').textContent;
+      lobbySub.textContent = (selectedHoles || '—') + ' holes · ' +
+        (document.getElementById('classicScoreToggle').checked ? 'Classic scoring' : 'Party points') +
+        ' · share the code above to bring friends in';
+    } else {
+      const code = codeCells.map(c => c.value).join('');
+      lobbyTitle.textContent = 'Joined ' + code;
+      lobbySub.textContent = 'Sit tight — the host will start the round shortly.';
+    }
+
+    stepMode.hidden = true;
+    stepLobby.hidden = false;
+  }
+
+  document.getElementById('startHost').addEventListener('click', () => renderLobby('host'));
+  startJoinBtn.addEventListener('click', () => renderLobby('join'));
+})();
+</script>
+</body>
+</html>
