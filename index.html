@@ -549,45 +549,44 @@
   .player-chip.controlled{
     opacity: 0.9;
   }
-  .chip-corner{
-    position: absolute;
-    width: 11px; height: 11px;
-    border: 0 solid var(--accent-teal);
-    pointer-events: none;
-  }
-  .chip-corner-tl{ top: -3px; left: -3px; border-top-width: 2px; border-left-width: 2px; border-radius: 6px 0 0 0; }
-  .chip-corner-tr{ top: -3px; right: -3px; border-top-width: 2px; border-right-width: 2px; border-radius: 0 6px 0 0; }
-  .chip-corner-bl{ bottom: -3px; left: -3px; border-bottom-width: 2px; border-left-width: 2px; border-radius: 0 0 0 6px; }
-  .chip-corner-br{ bottom: -3px; right: -3px; border-bottom-width: 2px; border-right-width: 2px; border-radius: 0 0 6px 0; }
-  .self-badge{
-    position: absolute;
-    bottom: -4px; right: -4px;
-    width: 15px; height: 15px;
-    border-radius: 50%;
-    background: var(--accent-teal);
-    color: var(--accent-teal-ink);
-    font-size: 0.58rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 0 2px var(--bg-elevated);
-  }
-  .controlled-dot{
-    position: absolute;
-    bottom: -3px; right: -3px;
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    border: 2px solid var(--accent-teal);
-    background: var(--bg-elevated);
-  }
   .player-chip{ cursor: pointer; }
   .player-chip .crown{
     position: absolute;
     top: -11px;
     font-size: 0.85rem;
   }
-  .player-chip .disc-chip{ width: 40px; height: 40px; font-size: 1.05rem; }
+  .player-chip .disc-chip{ width: 40px; height: 40px; font-size: 1.05rem; position: relative; }
+  .disc-chip.self-ring{
+    box-shadow:
+      0 0 0 2px var(--bg-elevated),
+      0 0 0 4px var(--accent-teal);
+  }
+  .disc-chip.self-ring::before{
+    content: '';
+    position: absolute;
+    inset: -7px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--accent-teal) 40%, transparent);
+    pointer-events: none;
+  }
+  .avatar-badge{
+    position: absolute;
+    bottom: -3px; right: -3px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent-teal);
+    color: var(--accent-teal-ink);
+    font-size: 0.55rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px var(--bg-elevated);
+  }
+  .avatar-badge.controlled-only{
+    background: var(--bg-elevated);
+    border: 2px solid var(--accent-teal);
+  }
   .player-chip .chip-points{
     font-family: var(--font-mono);
     font-weight: 600;
@@ -1199,6 +1198,9 @@
       <input type="text" id="newLocalPlayerName" maxlength="16" placeholder="Player name">
       <button class="btn-primary" id="addLocalPlayerBtn" type="button">Add</button>
     </div>
+
+    <div class="modal-section-title">Round controls</div>
+    <button class="btn-mini btn-mini-danger" id="endRoundNowBtn" type="button" hidden style="width:100%; padding:10px;">End Round Now — go to results</button>
   </div>
 </div>
 
@@ -1690,9 +1692,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
         ${isLeader ? '<span class="crown">👑</span>' : ''}
         ${hasActiveDisrupt ? '<span class="fx-icon fx-icon-fire">🔥</span>' : ''}
         ${hasActiveHelp ? '<span class="fx-icon fx-icon-gloria">✨</span>' : ''}
-        ${isActive ? '<span class="chip-corner chip-corner-tl"></span><span class="chip-corner chip-corner-tr"></span><span class="chip-corner chip-corner-bl"></span><span class="chip-corner chip-corner-br"></span><span class="self-badge">✓</span>' : ''}
-        ${isControlledOnly ? '<span class="controlled-dot"></span>' : ''}
-        <div class="disc-chip">${p.avatar || '🥏'}</div>
+        <div class="disc-chip${isActive ? ' self-ring' : ''}">${p.avatar || '🥏'}${isActive ? '<span class="avatar-badge">✓</span>' : ''}${isControlledOnly ? '<span class="avatar-badge controlled-only"></span>' : ''}</div>
         <div class="chip-points">${value}${isClassic ? '' : ' pts'}</div>
         <div class="chip-name">${p.name || 'Player'}${nameSuffix}${p.connected === false ? ' · offline' : ''}</div>
         ${previous.length ? `<div class="active-effects">${previous.map(() => '<span class="effect-dot past"></span>').join('')}</div>` : ''}
@@ -2092,6 +2092,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   }
 
   function renderManagePanel(room){
+    document.getElementById('endRoundNowBtn').hidden = !(room.hostId === playerId && room.status === 'playing');
     managePlayerList.innerHTML = '';
     const players = Object.entries(room.players || {});
     players.forEach(([id, p]) => {
@@ -2178,6 +2179,11 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     if (e.target === manageModalOverlay) closeManagePanel();
   });
   document.getElementById('addLocalPlayerBtn').addEventListener('click', addLocalPlayer);
+  document.getElementById('endRoundNowBtn').addEventListener('click', async () => {
+    if (!currentRoomCode || !latestRoom || latestRoom.hostId !== playerId) return;
+    await update(ref(db, `rooms/${currentRoomCode}`), { status: 'finished', finishedAt: serverTimestamp() });
+    closeManagePanel();
+  });
 
   async function maybeResolveHole(code, room){
     if (room.hostId !== playerId) return; // only the host resolves, avoids double-writes
