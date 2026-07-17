@@ -493,31 +493,31 @@
   }
   .control-tabs{
     display: flex;
-    gap: 6px;
+    gap: 4px;
     overflow-x: auto;
-    padding: 10px 20px 0;
+    margin: -6px -4px 18px;
+    padding: 0 4px;
+    border-bottom: 1.5px solid var(--border);
     scrollbar-width: none;
   }
   .control-tabs::-webkit-scrollbar{ display: none; }
   .control-tab{
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 11px;
-    border-radius: 999px;
-    border: 1.5px solid var(--border-strong);
-    background: var(--surface);
-    color: var(--ink-muted);
+    background: none;
+    border: none;
+    padding: 10px 14px;
     font-family: var(--font-body);
-    font-size: 0.76rem;
+    font-size: 0.86rem;
     font-weight: 600;
+    color: var(--ink-muted);
     cursor: pointer;
+    border-bottom: 2.5px solid transparent;
+    margin-bottom: -1.5px;
+    transition: color .15s ease, border-color .15s ease;
   }
   .control-tab.active{
-    border-color: var(--accent-teal);
-    background: color-mix(in srgb, var(--accent-teal) 16%, var(--surface));
     color: var(--ink);
+    border-bottom-color: var(--accent-teal);
   }
   .leaderboard-row{
     display: flex;
@@ -720,14 +720,14 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--ink-muted);
-    margin-bottom: 4px;
+    margin-bottom: 16px;
   }
   .hole-event-banner{
     background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--accent-gold) 20%, var(--surface)));
     border: 1.5px solid var(--accent-gold);
     border-radius: var(--radius-md);
     padding: 14px 16px;
-    margin: 14px 0 4px;
+    margin: 0 0 16px;
   }
   .hole-event-label{
     font-family: var(--font-mono);
@@ -1134,7 +1134,6 @@
   </header>
 
   <header class="game-header" id="gameHeader" hidden>
-    <div class="control-tabs" id="controlTabs" hidden></div>
     <div class="leaderboard-row">
       <div class="leaderboard" id="leaderboard"></div>
       <button class="manage-btn" id="manageBtnGame" type="button" aria-label="Game settings">⚙</button>
@@ -1194,15 +1193,26 @@
           </div>
         </div>
 
-        <div class="toggle-row">
-          <div class="label-block">
-            <strong>Classic golf scoring</strong>
-            <span>Off uses party points instead</span>
+        <div>
+          <label>Scoring mode</label>
+          <div class="pill-group" id="scoringModeGroup">
+            <div class="pill-option active" data-mode="party">Party Points</div>
+            <div class="pill-option" data-mode="classic">Classic Golf</div>
+            <div class="pill-option" data-mode="medals">Medals</div>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="classicScoreToggle">
-            <span class="track"></span>
-          </label>
+        </div>
+
+        <div id="medalsOptionsWrap" hidden>
+          <div class="toggle-row">
+            <div class="label-block">
+              <strong>Accumulate medals</strong>
+              <span>A tied hole rolls its medal into the next one instead of being lost</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="accumulateMedalsToggle">
+              <span class="track"></span>
+            </label>
+          </div>
         </div>
 
         <div>
@@ -1287,6 +1297,7 @@
 
     <!-- STEP 4: Live Game -->
     <section class="card step" id="stepGame" hidden>
+      <div class="control-tabs" id="controlTabs" hidden></div>
       <div id="holeSwipeZone">
         <div class="hole-indicator" id="holeLabel">Hole 1 of 9</div>
 
@@ -1589,6 +1600,19 @@ function pickRandomPower(settings){
     selectedHoles = parseInt(e.target.value, 10) || null;
   });
 
+  // ---------- Scoring mode ----------
+  const scoringModeGroup = document.getElementById('scoringModeGroup');
+  const medalsOptionsWrap = document.getElementById('medalsOptionsWrap');
+  let selectedScoringMode = 'party';
+  scoringModeGroup.querySelectorAll('.pill-option').forEach(pill => {
+    pill.addEventListener('click', () => {
+      scoringModeGroup.querySelectorAll('.pill-option').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      selectedScoringMode = pill.dataset.mode;
+      medalsOptionsWrap.hidden = selectedScoringMode !== 'medals';
+    });
+  });
+
   // ---------- Power types / rarities (multi-select toggle pills, at least one must stay on) ----------
   function setupTogglePillGroup(groupId, datasetKey, initial){
     const group = document.getElementById(groupId);
@@ -1698,9 +1722,10 @@ function pickRandomPower(settings){
 
     const isHost = room.hostId === playerId;
     const s = room.settings || {};
+    const modeLabels = { party: 'Party points', classic: 'Classic scoring', medals: 'Medals' };
     lobbyTitle.textContent = (isHost ? 'Room ' : 'Joined ') + code;
     lobbySub.textContent = (s.holes || '—') + ' holes · ' +
-      (s.classicScoring ? 'Classic scoring' : 'Party points') +
+      (modeLabels[s.scoringMode] || 'Party points') +
       (isHost ? ' · share the code above to bring friends in' : ' · sit tight — the host will start the round shortly');
 
     startGameBtn.hidden = !isHost;
@@ -1772,7 +1797,8 @@ function pickRandomPower(settings){
     }
 
     const holes = selectedHoles || 9;
-    const classicScoring = document.getElementById('classicScoreToggle').checked;
+    const scoringMode = selectedScoringMode;
+    const accumulateMedals = document.getElementById('accumulateMedalsToggle').checked;
     const name = usernameInput.value.trim();
     const holeEventsEnabled = holeEventsToggle.checked;
     const holeEventsFrequency = parseInt(holeEventsFreqSlider.value, 10);
@@ -1784,8 +1810,9 @@ function pickRandomPower(settings){
       hostId: playerId,
       createdAt: serverTimestamp(),
       currentHole: 1,
+      medalPot: 1,
       settings: {
-        holes, classicScoring,
+        holes, scoringMode, accumulateMedals,
         powerTypes: powerTypesSelection.get(),
         rarities: raritiesSelection.get(),
         chaosLevel: parseInt(chaosSlider.value, 10),
@@ -1836,12 +1863,13 @@ function pickRandomPower(settings){
     const emptySlots = [{ state: 'empty' }, { state: 'empty' }, { state: 'empty' }];
 
     if (room.status === 'playing') {
-      // joining mid-round: start level with whoever's currently in last place, plus a power to help catch up
-      const isClassic = !!(room.settings && room.settings.classicScoring);
+      // joining mid-round: start level with whoever's currently in last place (party mode only), plus a power to help catch up
+      const scoringMode = getScoringMode(room);
       const existingPlayers = Object.values(room.players || {});
-      playerUpdates.points = (!isClassic && existingPlayers.length)
+      playerUpdates.points = (scoringMode === 'party' && existingPlayers.length)
         ? Math.min(...existingPlayers.map(p => p.points || 0))
         : 0;
+      if (scoringMode === 'medals') playerUpdates.medals = 0;
       const power = pickRandomPower(room.settings);
       const slots = emptySlots.slice();
       if (power) {
@@ -1986,14 +2014,30 @@ function pickRandomPower(settings){
     return total;
   }
 
+  function getScoringMode(room){
+    return (room.settings && room.settings.scoringMode) || 'party';
+  }
+
+  function scoreValueFor(room, id, mode){
+    if (mode === 'classic') return totalStrokes(room, id);
+    if (mode === 'medals') return (room.players[id] && room.players[id].medals) || 0;
+    return (room.players[id] && room.players[id].points) || 0;
+  }
+
+  function formatScoreValue(mode, value){
+    if (mode === 'medals') return `🥇 ${value}`;
+    if (mode === 'classic') return `${value}`;
+    return `${value} pts`;
+  }
+
   function renderLeaderboard(room, holeChanged){
-    const isClassic = !!(room.settings && room.settings.classicScoring);
+    const scoringMode = getScoringMode(room);
     const players = Object.entries(room.players || {});
     const ranked = players.map(([id, p]) => ({
       id, p,
-      value: isClassic ? totalStrokes(room, id) : (p.points || 0)
+      value: scoreValueFor(room, id, scoringMode)
     }));
-    ranked.sort((a, b) => isClassic ? a.value - b.value : b.value - a.value);
+    ranked.sort((a, b) => scoringMode === 'classic' ? a.value - b.value : b.value - a.value);
     const bestValue = ranked.length ? ranked[0].value : null;
 
     leaderboardEl.innerHTML = '';
@@ -2020,7 +2064,7 @@ function pickRandomPower(settings){
         ${hasActiveDisrupt ? '<span class="fx-icon fx-icon-fire">🔥</span>' : ''}
         ${hasActiveHelp ? '<span class="fx-icon fx-icon-gloria">✨</span>' : ''}
         <div class="disc-chip${isActive ? ' self-ring' : ''}">${p.avatar || '🥏'}${isActive ? '<span class="avatar-badge">✓</span>' : ''}${isControlledOnly ? '<span class="avatar-badge controlled-only"></span>' : ''}</div>
-        <div class="chip-points">${value}${isClassic ? '' : ' pts'}</div>
+        <div class="chip-points">${formatScoreValue(scoringMode, value)}</div>
         <div class="chip-name">${p.name || 'Player'}${p.left ? ' · left' : (p.connected === false ? ' · offline' : '')}</div>
       `;
       chip.addEventListener('click', () => openPlayerModal(room, id));
@@ -2050,7 +2094,7 @@ function pickRandomPower(settings){
       const tab = document.createElement('button');
       tab.type = 'button';
       tab.className = 'control-tab' + (id === activePlayerId ? ' active' : '');
-      tab.innerHTML = `<span class="tab-avatar">${p.avatar || '🥏'}</span><span>${p.name || 'Player'}</span>`;
+      tab.textContent = p.name || 'Player';
       tab.addEventListener('click', () => {
         if (activePlayerId === id) return;
         activePlayerId = id;
@@ -2424,15 +2468,16 @@ function pickRandomPower(settings){
     const stats = computePlayerStats(room, id);
     const nemesisName = stats.nemesisId ? (room.players[stats.nemesisId]?.name || 'Someone') : null;
     const targetName = stats.targetId ? (room.players[stats.targetId]?.name || 'Someone') : null;
-    const isClassic = !!(room.settings && room.settings.classicScoring);
-    const value = isClassic ? totalStrokes(room, id) : (p.points || 0);
+    const scoringMode = getScoringMode(room);
+    const value = scoreValueFor(room, id, scoringMode);
+    const valueLabel = scoringMode === 'classic' ? `${value} strokes` : formatScoreValue(scoringMode, value);
 
     playerModalContent.innerHTML = `
       <div class="modal-header">
         <div class="disc-chip">${p.avatar || '🥏'}</div>
         <div>
           <div class="modal-name">${p.name || 'Player'}${id === activePlayerId ? ' (you)' : (controlledPlayerIds.includes(id) ? ' (yours)' : '')}</div>
-          <div class="modal-sub">${value}${isClassic ? ' strokes' : ' pts'} · ${room.hostId === id ? 'Host' : 'Player'}</div>
+          <div class="modal-sub">${valueLabel} · ${room.hostId === id ? 'Host' : 'Player'}</div>
         </div>
       </div>
 
@@ -2631,10 +2676,10 @@ function pickRandomPower(settings){
     players.forEach(id => { if (holeScores[id] < best) best = holeScores[id]; });
     const winners = players.filter(id => holeScores[id] === best);
 
-    const isClassic = !!(room.settings && room.settings.classicScoring);
+    const scoringMode = getScoringMode(room);
     const updates = {};
 
-    if (!isClassic) {
+    if (scoringMode === 'party') {
       const sorted = [...players].sort((a, b) => holeScores[a] - holeScores[b]);
       let rank = 0, prevScore = null;
       sorted.forEach((id, idx) => {
@@ -2643,7 +2688,20 @@ function pickRandomPower(settings){
         const current = room.players[id].points || 0;
         updates[`players/${id}/points`] = current + pointsAward;
       });
+    } else if (scoringMode === 'medals') {
+      const accumulate = !!(room.settings && room.settings.accumulateMedals);
+      const currentPot = room.medalPot || 1;
+      if (winners.length === 1) {
+        const winnerId = winners[0];
+        const current = room.players[winnerId].medals || 0;
+        updates[`players/${winnerId}/medals`] = current + currentPot;
+        updates.medalPot = 1;
+      } else {
+        // tied hole — no medal awarded
+        updates.medalPot = accumulate ? currentPot + 1 : 1;
+      }
     }
+    // classic mode: nothing to award, raw strokes already tracked in room.scores
 
     players.forEach(id => {
       const original = room.players[id].powerSlots || [];
@@ -2684,14 +2742,14 @@ function pickRandomPower(settings){
   // ---------- Round summary ----------
   function computeRoundSummary(room){
     const players = Object.entries(room.players || {});
-    const isClassic = !!(room.settings && room.settings.classicScoring);
+    const scoringMode = getScoringMode(room);
 
     const standings = players.map(([id, p]) => ({
       id, p,
-      value: isClassic ? totalStrokes(room, id) : (p.points || 0),
+      value: scoreValueFor(room, id, scoringMode),
       strokes: totalStrokes(room, id)
     }));
-    standings.sort((a, b) => isClassic ? a.value - b.value : b.value - a.value);
+    standings.sort((a, b) => scoringMode === 'classic' ? a.value - b.value : b.value - a.value);
 
     const allEffects = [];
     players.forEach(([pid, p]) => {
@@ -2717,7 +2775,7 @@ function pickRandomPower(settings){
     });
 
     return {
-      standings, isClassic,
+      standings, scoringMode,
       mostPowersUsed: topOf(givenCounts),
       mostDisrupted: topOf(disruptReceivedCounts),
       bestGolf,
@@ -2748,7 +2806,7 @@ function pickRandomPower(settings){
           <strong>${s.p.name || 'Player'}</strong>
           <span>${s.strokes} strokes</span>
         </div>
-        <div class="standing-value">${s.value}${summary.isClassic ? '' : ' pts'}</div>
+        <div class="standing-value">${formatScoreValue(summary.scoringMode, s.value)}</div>
       </div>
     `).join('');
 
@@ -2812,6 +2870,7 @@ function pickRandomPower(settings){
 
     const hole = room.currentHole || 1;
     const holeChanged = lastRenderedHole !== null && hole !== lastRenderedHole;
+    if (holeChanged) activePlayerId = playerId;
 
     manageBtnGame.hidden = false;
     renderLeaderboard(room, holeChanged);
