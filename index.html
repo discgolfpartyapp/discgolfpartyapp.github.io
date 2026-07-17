@@ -21,7 +21,8 @@
     --ink-muted: #52685B;
     --accent-teal: #12967F;
     --accent-teal-ink: #ffffff;
-    --accent-gold: #A66E00;
+    --accent-gold: #D97706;
+    --accent-gold-ink: #ffffff;
     --accent-coral: #C63F3F;
     --border: rgba(16,36,26,0.14);
     --border-strong: rgba(16,36,26,0.26);
@@ -42,6 +43,7 @@
     --accent-teal: #2DD4A7;
     --accent-teal-ink: #06231A;
     --accent-gold: #F2B705;
+    --accent-gold-ink: #241800;
     --accent-coral: #FF7A6E;
     --border: rgba(242,247,240,0.12);
     --border-strong: rgba(242,247,240,0.22);
@@ -330,9 +332,8 @@
   .pill-option.active{
     background: var(--accent-gold);
     border-color: var(--accent-gold);
-    color: #241800;
+    color: var(--accent-gold-ink);
   }
-  html[data-theme="dark"] .pill-option.active{ color: #241800; }
   .custom-holes{ margin-top: 10px; display:none; }
   .custom-holes.visible{ display:block; }
 
@@ -624,7 +625,7 @@
   }
   .chip-points.points-pop{
     display: inline-block;
-    animation: points-pop 0.5s ease;
+    animation: points-pop 0.75s ease;
   }
 
   @keyframes hole-swipe{
@@ -634,7 +635,7 @@
     100%{ transform: translateX(0); opacity: 1; }
   }
   .hole-swipe{
-    animation: hole-swipe 0.5s ease;
+    animation: hole-swipe 0.75s ease;
   }
 
   @keyframes power-pop-common{
@@ -656,9 +657,9 @@
     85%{ transform: scale(0.97) rotate(-3deg); }
     100%{ transform: scale(1) rotate(0deg) translateY(0); opacity: 1; filter: brightness(1); }
   }
-  .power-card.entrance-common{ animation: power-pop-common 0.4s ease; }
-  .power-card.entrance-rare{ animation: power-pop-rare 0.55s ease; }
-  .power-card.entrance-legendary{ animation: power-pop-legendary 0.8s cubic-bezier(.36,.07,.19,.97); }
+  .power-card.entrance-common{ animation: power-pop-common 0.6s ease; }
+  .power-card.entrance-rare{ animation: power-pop-rare 0.85s ease; }
+  .power-card.entrance-legendary{ animation: power-pop-legendary 1.2s cubic-bezier(.36,.07,.19,.97); }
 
   @keyframes event-drop-in{
     0%{ transform: translateY(-70px); opacity: 0; }
@@ -667,7 +668,7 @@
     100%{ transform: translateY(0); opacity: 1; }
   }
   .hole-event-banner.drop-in{
-    animation: event-drop-in 0.5s cubic-bezier(.34,1.56,.64,1) both;
+    animation: event-drop-in 0.75s cubic-bezier(.34,1.56,.64,1) both;
   }
   @media (prefers-reduced-motion: reduce){
     .chip-points.points-pop, .hole-swipe, .power-card.entrance-common,
@@ -1792,7 +1793,7 @@ function pickRandomPower(settings){
       },
       holeEvents: holeEventsSchedule,
       players: {
-        [playerId]: { name, avatar: selectedAvatar, points: 0, connected: true, joinedAt: serverTimestamp() }
+        [playerId]: { name, avatar: selectedAvatar, points: 0, connected: true, joinedAt: serverTimestamp(), powerSlots: [{ state: 'empty' }, { state: 'empty' }, { state: 'empty' }] }
       }
     });
 
@@ -1832,6 +1833,7 @@ function pickRandomPower(settings){
 
     const name = usernameInput.value.trim();
     const playerUpdates = { name, avatar: selectedAvatar, connected: true, joinedAt: serverTimestamp() };
+    const emptySlots = [{ state: 'empty' }, { state: 'empty' }, { state: 'empty' }];
 
     if (room.status === 'playing') {
       // joining mid-round: start level with whoever's currently in last place, plus a power to help catch up
@@ -1841,12 +1843,14 @@ function pickRandomPower(settings){
         ? Math.min(...existingPlayers.map(p => p.points || 0))
         : 0;
       const power = pickRandomPower(room.settings);
+      const slots = emptySlots.slice();
       if (power) {
-        const instanceId = 'pw-' + Math.random().toString(36).slice(2, 9);
-        playerUpdates[`powers/${instanceId}`] = power.id;
+        slots[0] = { state: 'held', instanceId: 'pw-' + Math.random().toString(36).slice(2, 9), powerId: power.id };
       }
+      playerUpdates.powerSlots = slots;
     } else {
       playerUpdates.points = 0;
+      playerUpdates.powerSlots = emptySlots;
     }
 
     await update(ref(db, `rooms/${code}/players/${playerId}`), playerUpdates);
@@ -2058,7 +2062,9 @@ function pickRandomPower(settings){
     });
   }
 
-  const EVENT_DROP_DELAY_MS = 1100; // let the points-pop / swipe / power-entrance settle first
+  const EVENT_DROP_DELAY_MS = 1650; // let the points-pop / swipe / power-entrance settle first
+  let eventDropPendingForHole = null;
+  let eventDropTimer = null;
 
   function renderHole(code, room, holeChanged){
     const hole = room.currentHole || 1;
@@ -2079,17 +2085,26 @@ function pickRandomPower(settings){
       document.getElementById('holeEventName').textContent = event.name;
       document.getElementById('holeEventDesc').textContent = event.description;
       if (holeChanged) {
+        // fresh hole advance — hide it now, and schedule the drop-in reveal
         holeEventBanner.hidden = true;
-        setTimeout(() => {
+        holeEventBanner.classList.remove('drop-in');
+        eventDropPendingForHole = hole;
+        clearTimeout(eventDropTimer);
+        eventDropTimer = setTimeout(() => {
+          if (eventDropPendingForHole !== hole) return; // hole moved on again before this fired
+          eventDropPendingForHole = null;
           holeEventBanner.hidden = false;
           triggerAnimation(holeEventBanner, 'drop-in');
         }, EVENT_DROP_DELAY_MS);
+      } else if (eventDropPendingForHole === hole) {
+        // a drop is already scheduled for this hole — don't let an unrelated re-render reveal it early
       } else {
         holeEventBanner.classList.remove('drop-in');
         holeEventBanner.hidden = false;
       }
     } else {
       holeEventBanner.hidden = true;
+      eventDropPendingForHole = null;
     }
 
     const holeScores = (room.scores && room.scores[hole]) || {};
@@ -2127,90 +2142,94 @@ function pickRandomPower(settings){
       return;
     }
     const me = room.players && room.players[activePlayerId];
-    const myPowers = me && me.powers ? Object.entries(me.powers) : [];
-    const newInstanceIds = holeChanged
-      ? myPowers.filter(([instanceId]) => !lastPowerInstanceIds.has(instanceId)).map(([instanceId]) => instanceId)
-      : [];
-    powersTray.innerHTML = '';
-    myPowers.forEach(([instanceId, powerId]) => {
-      const power = getPower(powerId);
-      if (!power) return;
-      const isNew = newInstanceIds.includes(instanceId);
-      const card = document.createElement('div');
-      card.className = `power-card type-${power.type} tier-${power.tier}` + (isNew ? ` entrance-${power.tier}` : '');
-      card.innerHTML = `
-        <div class="power-tier">${power.tier} · ${power.type}</div>
-        <div class="power-name">${power.name}</div>
-        <div class="power-desc">${power.description}</div>
-      `;
-      card.addEventListener('pointerdown', (e) => {
-        const startX = e.clientX;
-        const startY = e.clientY;
-        let lifted = false;
-        dragGestureActive = true;
+    const rawSlots = (me && me.powerSlots) || [];
+    const slots = [0, 1, 2].map(i => rawSlots[i] || { state: 'empty' });
 
-        function onPreMove(ev){
-          if (ev.pointerId !== e.pointerId) return;
-          const dx = ev.clientX - startX;
-          const dy = ev.clientY - startY;
-          // require a clear upward swipe (not a sideways scroll) to "pick up" the card
-          if (!lifted && (startY - ev.clientY) > 14 && Math.abs(dy) > Math.abs(dx)) {
-            lifted = true;
-            card.removeEventListener('pointermove', onPreMove);
-            startDrag(ev, card, instanceId, powerId, power.type);
-          }
+    const newInstanceIds = holeChanged
+      ? slots.filter(s => s.state === 'held' && !lastPowerInstanceIds.has(s.instanceId)).map(s => s.instanceId)
+      : [];
+
+    const anyHeldOrUsed = slots.some(s => s.state !== 'empty');
+    powersTray.innerHTML = '';
+
+    slots.forEach((slot, slotIndex) => {
+      if (slot.state === 'held') {
+        const power = getPower(slot.powerId);
+        if (!power) {
+          const emptySlot = document.createElement('div');
+          emptySlot.className = 'powers-empty-slot';
+          emptySlot.textContent = 'Empty slot';
+          powersTray.appendChild(emptySlot);
+          return;
         }
-        function onPreEnd(ev){
-          if (ev.pointerId !== e.pointerId) return;
-          card.removeEventListener('pointermove', onPreMove);
-          card.removeEventListener('pointerup', onPreEnd);
-          card.removeEventListener('pointercancel', onPreEnd);
-          if (!lifted) {
-            dragGestureActive = false;
-            if (pendingTrayRoom) {
-              const room = pendingTrayRoom;
-              pendingTrayRoom = null;
-              renderPowersTray(room);
+        const isNew = newInstanceIds.includes(slot.instanceId);
+        const card = document.createElement('div');
+        card.className = `power-card type-${power.type} tier-${power.tier}` + (isNew ? ` entrance-${power.tier}` : '');
+        card.innerHTML = `
+          <div class="power-tier">${power.tier} · ${power.type}</div>
+          <div class="power-name">${power.name}</div>
+          <div class="power-desc">${power.description}</div>
+        `;
+        card.addEventListener('pointerdown', (e) => {
+          const startX = e.clientX;
+          const startY = e.clientY;
+          let lifted = false;
+          dragGestureActive = true;
+
+          function onPreMove(ev){
+            if (ev.pointerId !== e.pointerId) return;
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+            // require a clear upward swipe (not a sideways scroll) to "pick up" the card
+            if (!lifted && (startY - ev.clientY) > 14 && Math.abs(dy) > Math.abs(dx)) {
+              lifted = true;
+              card.removeEventListener('pointermove', onPreMove);
+              startDrag(ev, card, slotIndex, power.type);
             }
           }
-        }
-        card.addEventListener('pointermove', onPreMove);
-        card.addEventListener('pointerup', onPreEnd);
-        card.addEventListener('pointercancel', onPreEnd);
-      });
-      powersTray.appendChild(card);
+          function onPreEnd(ev){
+            if (ev.pointerId !== e.pointerId) return;
+            card.removeEventListener('pointermove', onPreMove);
+            card.removeEventListener('pointerup', onPreEnd);
+            card.removeEventListener('pointercancel', onPreEnd);
+            if (!lifted) {
+              dragGestureActive = false;
+              if (pendingTrayRoom) {
+                const r = pendingTrayRoom;
+                pendingTrayRoom = null;
+                renderPowersTray(r);
+              }
+            }
+          }
+          card.addEventListener('pointermove', onPreMove);
+          card.addEventListener('pointerup', onPreEnd);
+          card.addEventListener('pointercancel', onPreEnd);
+        });
+        powersTray.appendChild(card);
+      } else if (slot.state === 'used') {
+        const power = getPower(slot.powerId);
+        const targetName = (room.players[slot.targetPlayerId] && room.players[slot.targetPlayerId].name) || 'them';
+        const usedCard = document.createElement('div');
+        usedCard.className = 'power-card used-card';
+        usedCard.innerHTML = `
+          <div class="power-tier">used this hole</div>
+          <div class="power-name">${power ? power.name : 'Power'}</div>
+          <div class="power-desc">Sent to ${targetName}${slot.targetPlayerId === activePlayerId ? ' (yourself)' : ''}</div>
+          <button class="undo-btn" type="button">↺ Undo</button>
+        `;
+        usedCard.querySelector('.undo-btn').addEventListener('click', () => undoPowerSlot(slotIndex));
+        powersTray.appendChild(usedCard);
+      } else {
+        const emptySlot = document.createElement('div');
+        emptySlot.className = 'powers-empty-slot';
+        emptySlot.textContent = !anyHeldOrUsed && slotIndex === 0
+          ? 'No powers yet — win a hole and everyone else gets one'
+          : 'Empty slot';
+        powersTray.appendChild(emptySlot);
+      }
     });
 
-    const currentHole = room.currentHole || 1;
-    const lastUse = me && me.lastPowerUse;
-    const showUndo = lastUse && lastUse.hole === currentHole;
-
-    if (showUndo) {
-      const targetName = (room.players[lastUse.targetPlayerId] && room.players[lastUse.targetPlayerId].name) || 'them';
-      const usedPower = getPower(lastUse.powerId);
-      const usedCard = document.createElement('div');
-      usedCard.className = 'power-card used-card';
-      usedCard.innerHTML = `
-        <div class="power-tier">used this hole</div>
-        <div class="power-name">${usedPower ? usedPower.name : 'Power'}</div>
-        <div class="power-desc">Sent to ${targetName}${lastUse.targetPlayerId === activePlayerId ? ' (yourself)' : ''}</div>
-        <button class="undo-btn" type="button">↺ Undo</button>
-      `;
-      usedCard.querySelector('.undo-btn').addEventListener('click', undoLastPower);
-      powersTray.appendChild(usedCard);
-    }
-
-    const emptySlots = Math.max(0, 3 - myPowers.length - (showUndo ? 1 : 0));
-    for (let i = 0; i < emptySlots; i++){
-      const slot = document.createElement('div');
-      slot.className = 'powers-empty-slot';
-      slot.textContent = myPowers.length === 0 && i === 0 && !showUndo
-        ? 'No powers yet — win a hole and everyone else gets one'
-        : 'Empty slot';
-      powersTray.appendChild(slot);
-    }
-
-    lastPowerInstanceIds = new Set(myPowers.map(([instanceId]) => instanceId));
+    lastPowerInstanceIds = new Set(slots.filter(s => s.state === 'held').map(s => s.instanceId));
     updatePowersHelpVisibility();
   }
 
@@ -2230,15 +2249,14 @@ function pickRandomPower(settings){
     updatePowersHelpVisibility();
   });
 
-  async function undoLastPower(){
+  async function undoPowerSlot(slotIndex){
     if (!currentRoomCode || !latestRoom) return;
     const me = latestRoom.players && latestRoom.players[activePlayerId];
-    const last = me && me.lastPowerUse;
-    if (!last) return;
+    const slot = me && me.powerSlots && me.powerSlots[slotIndex];
+    if (!slot || slot.state !== 'used') return;
     const updates = {};
-    updates[`players/${activePlayerId}/powers/${last.instanceId}`] = last.powerId;
-    updates[`players/${last.targetPlayerId}/activeEffects/${last.effectId}`] = null;
-    updates[`players/${activePlayerId}/lastPowerUse`] = null;
+    updates[`players/${activePlayerId}/powerSlots/${slotIndex}`] = { state: 'held', instanceId: slot.instanceId, powerId: slot.powerId };
+    updates[`players/${slot.targetPlayerId}/activeEffects/${slot.effectId}`] = null;
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
     showToast('Power undone.');
   }
@@ -2262,7 +2280,7 @@ function pickRandomPower(settings){
     });
   }
 
-  function startDrag(e, card, instanceId, powerId, type){
+  function startDrag(e, card, slotIndex, type){
     try { card.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
     card.classList.add('dragging');
 
@@ -2273,7 +2291,7 @@ function pickRandomPower(settings){
     document.body.appendChild(ghost);
     positionGhost(ghost, e.clientX, e.clientY);
 
-    const drag = { pointerId: e.pointerId, instanceId, powerId, type, card, ghost };
+    const drag = { pointerId: e.pointerId, slotIndex, type, card, ghost };
     activeDrag = drag;
 
     function onMove(ev){
@@ -2311,7 +2329,7 @@ function pickRandomPower(settings){
         showToast("That power can't be used there.");
         return;
       }
-      await usePower(drag.instanceId, drag.powerId, targetId);
+      await usePower(drag.slotIndex, targetId);
     } finally {
       if (pendingTrayRoom) {
         const room = pendingTrayRoom;
@@ -2321,14 +2339,19 @@ function pickRandomPower(settings){
     }
   }
 
-  async function usePower(instanceId, powerId, targetPlayerId){
-    if (!currentRoomCode) return;
-    const power = getPower(powerId);
-    const effectId = 'fx-' + Math.random().toString(36).slice(2, 9);
-    const activeHole = (latestRoom && latestRoom.currentHole) || 1;
+  async function usePower(slotIndex, targetPlayerId){
+    if (!currentRoomCode || !latestRoom) return;
     const actingPlayerId = activePlayerId;
+    const me = latestRoom.players && latestRoom.players[actingPlayerId];
+    const slot = me && me.powerSlots && me.powerSlots[slotIndex];
+    if (!slot || slot.state !== 'held') return; // stale drag (e.g. already used elsewhere) — ignore
+    const power = getPower(slot.powerId);
+    const effectId = 'fx-' + Math.random().toString(36).slice(2, 9);
+    const activeHole = latestRoom.currentHole || 1;
     const updates = {};
-    updates[`players/${actingPlayerId}/powers/${instanceId}`] = null;
+    updates[`players/${actingPlayerId}/powerSlots/${slotIndex}`] = {
+      state: 'used', instanceId: slot.instanceId, powerId: slot.powerId, targetPlayerId, effectId, hole: activeHole
+    };
     updates[`players/${targetPlayerId}/activeEffects/${effectId}`] = {
       name: power ? power.name : 'Power',
       type: power ? power.type : 'help',
@@ -2337,9 +2360,6 @@ function pickRandomPower(settings){
       from: actingPlayerId,
       appliedAt: Date.now(),
       appliedOnHole: activeHole
-    };
-    updates[`players/${actingPlayerId}/lastPowerUse`] = {
-      instanceId, powerId, effectId, targetPlayerId, hole: activeHole
     };
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
     playersUsedPower.add(actingPlayerId);
@@ -2571,7 +2591,8 @@ function pickRandomPower(settings){
     activePlayerId = newId;
 
     await update(ref(db, `rooms/${currentRoomCode}/players/${newId}`), {
-      name, avatar, points: 0, connected: true, joinedAt: serverTimestamp()
+      name, avatar, points: 0, connected: true, joinedAt: serverTimestamp(),
+      powerSlots: [{ state: 'empty' }, { state: 'empty' }, { state: 'empty' }]
     });
     onDisconnect(ref(db, `rooms/${currentRoomCode}/players/${newId}/connected`)).set(false);
 
@@ -2625,13 +2646,26 @@ function pickRandomPower(settings){
     }
 
     players.forEach(id => {
-      if (winners.includes(id)) return;
-      const existing = room.players[id].powers ? Object.keys(room.players[id].powers).length : 0;
-      if (existing >= 3) return;
-      const power = pickRandomPower(room.settings);
-      if (!power) return;
-      const instanceId = 'pw-' + Math.random().toString(36).slice(2, 9);
-      updates[`players/${id}/powers/${instanceId}`] = power.id;
+      const original = room.players[id].powerSlots || [];
+      const slots = [0, 1, 2].map(i => {
+        const s = original[i];
+        if (!s) return { state: 'empty' };
+        // a slot used during the hole that just resolved is now fully spent — free it up
+        if (s.state === 'used' && s.hole === hole) return { state: 'empty' };
+        return s;
+      });
+
+      if (!winners.includes(id)) {
+        const slotIndex = slots.findIndex(s => s.state === 'empty');
+        if (slotIndex !== -1) {
+          const power = pickRandomPower(room.settings);
+          if (power) {
+            slots[slotIndex] = { state: 'held', instanceId: 'pw-' + Math.random().toString(36).slice(2, 9), powerId: power.id };
+          }
+        }
+      }
+
+      updates[`players/${id}/powerSlots`] = slots;
     });
 
     updates[`holeResolved/${hole}`] = true;
