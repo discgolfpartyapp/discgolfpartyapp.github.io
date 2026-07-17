@@ -1,0 +1,72 @@
+[
+  {
+    "id": "putters-only",
+    "name": "That Was a Putter!",
+    "description": "Every throw this hole must be made with a putter (speed 1-3)."
+  },
+  {
+    "id": "off-hand-tee",
+    "name": "Off-Hand Tee",
+    "description": "Everyone throws their tee shot with their non-dominant hand."
+  },
+  {
+    "id": "no-run-up",
+    "name": "No Run-Up",
+    "description": "No run-up allowed on any throw this hole — everyone throws from a standstill."
+  },
+  {
+    "id": "scoober-zone",
+    "name": "Scoober Zone",
+    "description": "Any throw within 20m / 60ft of the basket must be thrown as a scoober."
+  },
+  {
+    "id": "silent-hole",
+    "name": "Silent Hole",
+    "description": "No talking, coaching, or advice allowed between throws this hole."
+  },
+  {
+    "id": "one-disc-wonder",
+    "name": "One Disc Wonder",
+    "description": "Each player picks a single disc at the tee and plays the entire hole with only that disc."
+  },
+  {
+    "id": "backwards-tee",
+    "name": "Backwards Tee",
+    "description": "Everyone tees off facing away from the basket, turning mid-throw."
+  },
+  {
+    "id": "opposite-stance-putts",
+    "name": "Opposite Stance",
+    "description": "All putts must be thrown with your stance reversed (opposite foot forward)."
+  },
+  {
+    "id": "sit-down-circle",
+    "name": "Sit-Down Circle",
+    "description": "Any putt from inside the circle must be thrown from a seated position."
+  },
+  {
+    "id": "roller-tee",
+    "name": "Roller Madness",
+    "description": "Tee shots must be thrown as an intentional roller."
+  },
+  {
+    "id": "no-straight-tee",
+    "name": "Sky or Anhyzer Only",
+    "description": "Tee shots must be a hyzer flip or anhyzer — no straight shots allowed."
+  },
+  {
+    "id": "slow-walk",
+    "name": "Slow-Mo Walk",
+    "description": "Players must walk, not jog, to their disc between every throw this hole."
+  },
+  {
+    "id": "no-practice-throws",
+    "name": "Grip It and Rip It",
+    "description": "No practice throws or warmup swings allowed before any shot this hole."
+  },
+  {
+    "id": "forehand-only-approach",
+    "name": "Chicken Wing",
+    "description": "Every approach shot must be thrown forehand — backhand is banned this hole."
+  }
+]
