@@ -268,8 +268,10 @@
     box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--accent-teal) 70%, transparent);
   }
   .btn-primary:disabled{ opacity: 0.45; cursor: not-allowed; }
-  .btn-primary:not(:disabled):hover{ transform: translateY(-2px) rotate(-1deg); }
-  .btn-primary:not(:disabled):active{ transform: translateY(0) rotate(0deg) scale(0.98); }
+  .btn-primary:not(:disabled):active{ transform: scale(0.98); }
+  @media (hover: hover) and (pointer: fine){
+    .btn-primary:not(:disabled):hover{ filter: brightness(1.06); }
+  }
 
   .btn-ghost{
     background: transparent;
@@ -333,6 +335,12 @@
   html[data-theme="dark"] .pill-option.active{ color: #241800; }
   .custom-holes{ margin-top: 10px; display:none; }
   .custom-holes.visible{ display:block; }
+
+  input[type="range"]{
+    width: 100%;
+    accent-color: var(--accent-teal);
+    margin-top: 6px;
+  }
 
   /* ---------- Toggle switch (scoring mode) ---------- */
   .toggle-row{
@@ -1035,6 +1043,7 @@
     <div class="leaderboard-row">
       <div class="leaderboard" id="leaderboard"></div>
       <button class="manage-btn" id="manageBtnGame" type="button" hidden aria-label="Manage players">⚙</button>
+      <button class="manage-btn" id="leaveBtnGame" type="button" aria-label="Leave game">🚪</button>
     </div>
   </header>
 
@@ -1100,6 +1109,28 @@
             <input type="checkbox" id="classicScoreToggle">
             <span class="track"></span>
           </label>
+        </div>
+
+        <div>
+          <label>Power types</label>
+          <div class="pill-group" id="powerTypesGroup">
+            <div class="pill-option active" data-type="help">Help</div>
+            <div class="pill-option active" data-type="disrupt">Disrupt</div>
+          </div>
+        </div>
+
+        <div>
+          <label>Power rarities</label>
+          <div class="pill-group" id="raritiesGroup">
+            <div class="pill-option active" data-tier="common">Common</div>
+            <div class="pill-option active" data-tier="rare">Rare</div>
+            <div class="pill-option active" data-tier="legendary">Legendary</div>
+          </div>
+        </div>
+
+        <div>
+          <label>Chaos level — <span id="chaosLabel">Balanced</span></label>
+          <input type="range" id="chaosSlider" min="1" max="5" step="1" value="3">
         </div>
 
         <div class="room-display">
@@ -1256,7 +1287,35 @@ fetch('./powers.json')
   .catch(err => console.error('Could not load powers.json', err));
 
 function getPower(id){ return POWERS.find(p => p.id === id); }
-function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() * POWERS.length)] : null; }
+
+const CHAOS_WEIGHTS = {
+  1: { common: 80, rare: 18, legendary: 2 },
+  2: { common: 65, rare: 30, legendary: 5 },
+  3: { common: 50, rare: 35, legendary: 15 },
+  4: { common: 35, rare: 40, legendary: 25 },
+  5: { common: 20, rare: 40, legendary: 40 }
+};
+
+function pickRandomPower(settings){
+  const enabledTypes = (settings && settings.powerTypes) || ['help', 'disrupt'];
+  const enabledRarities = (settings && settings.rarities) || ['common', 'rare', 'legendary'];
+  const chaosLevel = (settings && settings.chaosLevel) || 3;
+  const weights = CHAOS_WEIGHTS[chaosLevel] || CHAOS_WEIGHTS[3];
+
+  const pool = POWERS.filter(p => enabledTypes.includes(p.type) && enabledRarities.includes(p.tier));
+  if (!pool.length) return null;
+
+  const weighted = pool.map(p => ({ power: p, weight: weights[p.tier] || 1 }));
+  const total = weighted.reduce((sum, w) => sum + w.weight, 0);
+  if (total <= 0) return pool[Math.floor(Math.random() * pool.length)];
+
+  let r = Math.random() * total;
+  for (const w of weighted) {
+    if (r < w.weight) return w.power;
+    r -= w.weight;
+  }
+  return weighted[weighted.length - 1].power;
+}
 
 (function(){
   // ---------- Theme ----------
@@ -1359,6 +1418,33 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   });
   document.getElementById('customHolesInput').addEventListener('input', (e) => {
     selectedHoles = parseInt(e.target.value, 10) || null;
+  });
+
+  // ---------- Power types / rarities (multi-select toggle pills, at least one must stay on) ----------
+  function setupTogglePillGroup(groupId, datasetKey, initial){
+    const group = document.getElementById(groupId);
+    let selected = initial.slice();
+    group.querySelectorAll('.pill-option').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const key = pill.dataset[datasetKey];
+        const isActive = pill.classList.contains('active');
+        const activeCount = group.querySelectorAll('.pill-option.active').length;
+        if (isActive && activeCount === 1) return; // keep at least one enabled
+        pill.classList.toggle('active');
+        selected = Array.from(group.querySelectorAll('.pill-option.active')).map(p => p.dataset[datasetKey]);
+      });
+    });
+    return { get: () => selected };
+  }
+  const powerTypesSelection = setupTogglePillGroup('powerTypesGroup', 'type', ['help', 'disrupt']);
+  const raritiesSelection = setupTogglePillGroup('raritiesGroup', 'tier', ['common', 'rare', 'legendary']);
+
+  // ---------- Chaos level ----------
+  const chaosSlider = document.getElementById('chaosSlider');
+  const chaosLabel = document.getElementById('chaosLabel');
+  const CHAOS_NAMES = { 1: 'Chill', 2: 'Mild Mischief', 3: 'Balanced', 4: 'Spicy', 5: 'Full Chaos' };
+  chaosSlider.addEventListener('input', () => {
+    chaosLabel.textContent = CHAOS_NAMES[chaosSlider.value] || 'Balanced';
   });
 
   // ---------- Room code generation ----------
@@ -1499,7 +1585,12 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       hostId: playerId,
       createdAt: serverTimestamp(),
       currentHole: 1,
-      settings: { holes, classicScoring },
+      settings: {
+        holes, classicScoring,
+        powerTypes: powerTypesSelection.get(),
+        rarities: raritiesSelection.get(),
+        chaosLevel: parseInt(chaosSlider.value, 10)
+      },
       players: {
         [playerId]: { name, avatar: selectedAvatar, points: 0, connected: true, joinedAt: serverTimestamp() }
       }
@@ -1523,6 +1614,16 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const snap = await get(ref(db, 'rooms/' + code));
     if (!snap.exists() || isRoomStale(snap.val())) {
       if (snap.exists()) await remove(ref(db, 'rooms/' + code));
+      joinError.textContent = "Can't find a room with that code.";
+      joinError.hidden = false;
+      startJoinBtn.disabled = false;
+      startJoinBtn.textContent = 'Join Lobby';
+      return;
+    }
+
+    const room = snap.val();
+    if (room.status === 'finished') {
+      joinError.textContent = 'This round has already ended.';
       joinError.hidden = false;
       startJoinBtn.disabled = false;
       startJoinBtn.textContent = 'Join Lobby';
@@ -1530,9 +1631,25 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     }
 
     const name = usernameInput.value.trim();
-    await update(ref(db, `rooms/${code}/players/${playerId}`), {
-      name, avatar: selectedAvatar, points: 0, connected: true, joinedAt: serverTimestamp()
-    });
+    const playerUpdates = { name, avatar: selectedAvatar, connected: true, joinedAt: serverTimestamp() };
+
+    if (room.status === 'playing') {
+      // joining mid-round: start level with whoever's currently in last place, plus a power to help catch up
+      const isClassic = !!(room.settings && room.settings.classicScoring);
+      const existingPlayers = Object.values(room.players || {});
+      playerUpdates.points = (!isClassic && existingPlayers.length)
+        ? Math.min(...existingPlayers.map(p => p.points || 0))
+        : 0;
+      const power = pickRandomPower(room.settings);
+      if (power) {
+        const instanceId = 'pw-' + Math.random().toString(36).slice(2, 9);
+        playerUpdates[`powers/${instanceId}`] = power.id;
+      }
+    } else {
+      playerUpdates.points = 0;
+    }
+
+    await update(ref(db, `rooms/${code}/players/${playerId}`), playerUpdates);
     onDisconnect(ref(db, `rooms/${code}/players/${playerId}/connected`)).set(false);
     saveSession(code, name, selectedAvatar);
 
@@ -1637,6 +1754,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     submitScoreBtn.disabled = true;
     await update(ref(db, `rooms/${currentRoomCode}/scores/${hole}`), { [activePlayerId]: scoreVal });
     editingScore = false;
+    if (latestRoom) renderHole(currentRoomCode, latestRoom);
   });
 
   editScoreBtn.addEventListener('click', () => {
@@ -1694,7 +1812,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
         ${hasActiveHelp ? '<span class="fx-icon fx-icon-gloria">✨</span>' : ''}
         <div class="disc-chip${isActive ? ' self-ring' : ''}">${p.avatar || '🥏'}${isActive ? '<span class="avatar-badge">✓</span>' : ''}${isControlledOnly ? '<span class="avatar-badge controlled-only"></span>' : ''}</div>
         <div class="chip-points">${value}${isClassic ? '' : ' pts'}</div>
-        <div class="chip-name">${p.name || 'Player'}${nameSuffix}${p.connected === false ? ' · offline' : ''}</div>
+        <div class="chip-name">${p.name || 'Player'}${nameSuffix}${p.left ? ' · left' : (p.connected === false ? ' · offline' : '')}</div>
         ${previous.length ? `<div class="active-effects">${previous.map(() => '<span class="effect-dot past"></span>').join('')}</div>` : ''}
       `;
       chip.addEventListener('click', () => openPlayerModal(room, id));
@@ -1759,7 +1877,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
 
     const players = room.players || {};
     const waiting = Object.entries(players)
-      .filter(([id]) => holeScores[id] === undefined)
+      .filter(([id, p]) => !p.left && holeScores[id] === undefined)
       .map(([, p]) => p.name || 'Player');
     if (submitted && waiting.length) {
       scoreWaitingNote.hidden = false;
@@ -2101,6 +2219,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       const isHostRow = id === room.hostId;
       const isControlledByMe = controlledPlayerIds.includes(id);
       const statusBits = [isHostRow ? 'Host' : 'Player'];
+      if (p.left) statusBits.push('left the game');
       if (p.connected === false) statusBits.push('offline');
       if (isControlledByMe) statusBits.push('controlled by this device');
       row.innerHTML = `
@@ -2129,7 +2248,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     if (!currentRoomCode || controlledPlayerIds.includes(id)) return;
     controlledPlayerIds.push(id);
     saveControlledPlayerIds(currentRoomCode);
-    update(ref(db, `rooms/${currentRoomCode}/players/${id}`), { connected: true });
+    update(ref(db, `rooms/${currentRoomCode}/players/${id}`), { connected: true, left: null });
     onDisconnect(ref(db, `rooms/${currentRoomCode}/players/${id}/connected`)).set(false);
     activePlayerId = id;
     if (latestRoom) {
@@ -2150,6 +2269,33 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       if (activePlayerId === id) activePlayerId = playerId;
     }
     showToast('Player removed.');
+  }
+
+  async function leaveGame(){
+    if (!currentRoomCode || !latestRoom) return;
+    const idToLeave = activePlayerId;
+    if (idToLeave === latestRoom.hostId) {
+      showToast("As host, you can't leave your own identity — end the round instead, or hand off first.");
+      return;
+    }
+    const name = (latestRoom.players[idToLeave] && latestRoom.players[idToLeave].name) || 'You';
+    if (!confirm(`Leave the game as ${name}? The host can add you back in later, or continue without you.`)) return;
+
+    await update(ref(db, `rooms/${currentRoomCode}/players/${idToLeave}`), { left: true });
+
+    controlledPlayerIds = controlledPlayerIds.filter(id => id !== idToLeave);
+    saveControlledPlayerIds(currentRoomCode);
+
+    if (controlledPlayerIds.length === 0) {
+      resetToHome();
+      return;
+    }
+    activePlayerId = controlledPlayerIds[0];
+    if (latestRoom) {
+      renderLeaderboard(latestRoom);
+      renderHole(currentRoomCode, latestRoom);
+      renderPowersTray(latestRoom);
+    }
   }
 
   async function addLocalPlayer(){
@@ -2174,6 +2320,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
 
   document.getElementById('manageBtnLobby').addEventListener('click', openManagePanel);
   manageBtnGame.addEventListener('click', openManagePanel);
+  document.getElementById('leaveBtnGame').addEventListener('click', leaveGame);
   document.getElementById('manageModalClose').addEventListener('click', closeManagePanel);
   manageModalOverlay.addEventListener('click', (e) => {
     if (e.target === manageModalOverlay) closeManagePanel();
@@ -2190,7 +2337,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const hole = room.currentHole || 1;
     if (room.holeResolved && room.holeResolved[hole]) return;
 
-    const players = Object.keys(room.players || {});
+    const players = Object.keys(room.players || {}).filter(id => !room.players[id].left);
     const holeScores = (room.scores && room.scores[hole]) || {};
     const allIn = players.length > 0 && players.every(id => holeScores[id] !== undefined);
     if (!allIn) return;
@@ -2217,7 +2364,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       if (winners.includes(id)) return;
       const existing = room.players[id].powers ? Object.keys(room.players[id].powers).length : 0;
       if (existing >= 3) return;
-      const power = randomPower();
+      const power = pickRandomPower(room.settings);
       if (!power) return;
       const instanceId = 'pw-' + Math.random().toString(36).slice(2, 9);
       updates[`players/${id}/powers/${instanceId}`] = power.id;
