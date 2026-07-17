@@ -475,12 +475,57 @@
     background: linear-gradient(to bottom, var(--bg) 70%, transparent);
     padding-bottom: 6px;
   }
+  .control-tabs{
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 10px 20px 0;
+    scrollbar-width: none;
+  }
+  .control-tabs::-webkit-scrollbar{ display: none; }
+  .control-tab{
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink-muted);
+    font-family: var(--font-body);
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .control-tab.active{
+    border-color: var(--accent-teal);
+    background: color-mix(in srgb, var(--accent-teal) 16%, var(--surface));
+    color: var(--ink);
+  }
+  .leaderboard-row{
+    display: flex;
+    align-items: center;
+  }
+  .manage-btn{
+    flex-shrink: 0;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    background: var(--bg-elevated);
+    color: var(--ink);
+    font-size: 1rem;
+    cursor: pointer;
+    margin-right: 16px;
+  }
   .leaderboard{
     display: flex;
     gap: 10px;
     overflow-x: auto;
     padding: 22px 20px 10px;
     scrollbar-width: none;
+    flex: 1;
+    min-width: 0;
   }
   .leaderboard::-webkit-scrollbar{ display:none; }
   .player-chip{
@@ -501,6 +546,10 @@
   .player-chip.self{
     box-shadow: 0 0 0 2px var(--accent-teal);
     background: color-mix(in srgb, var(--accent-teal) 14%, var(--bg-elevated));
+  }
+  .player-chip.controlled{
+    box-shadow: 0 0 0 1.5px var(--accent-teal);
+    opacity: 0.85;
   }
   .player-chip{ cursor: pointer; }
   .player-chip .crown{
@@ -831,6 +880,52 @@
   .stat-box .stat-value{ font-family: var(--font-mono); font-weight: 700; font-size: 1.15rem; }
   .stat-box .stat-label{ font-size: 0.68rem; color: var(--ink-muted); margin-top: 2px; }
 
+  /* ---------- Manage players panel ---------- */
+  .manage-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    margin-bottom: 8px;
+  }
+  .manage-row .disc-chip{ width: 38px; height: 38px; font-size: 1rem; flex-shrink: 0; }
+  .manage-row .manage-info{ flex: 1; min-width: 0; }
+  .manage-row .manage-info strong{ display: block; font-size: 0.86rem; }
+  .manage-row .manage-info span{ font-size: 0.72rem; color: var(--ink-muted); }
+  .manage-row .manage-actions{ display: flex; gap: 6px; flex-shrink: 0; }
+  .btn-mini{
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--bg-elevated);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .btn-mini-danger{ border-color: var(--accent-coral); color: var(--accent-coral); }
+  .btn-mini:disabled{ opacity: 0.4; cursor: not-allowed; }
+  .add-local-form{
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .add-local-form input{
+    flex: 1;
+    padding: 11px 13px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+  }
+  .add-local-form .btn-primary{ width: auto; padding: 0 18px; }
+
   @media (min-width: 460px){
     body{ padding: 24px 0; }
     .app-shell{ border-radius: 32px; overflow: hidden; box-shadow: 0 30px 80px -30px rgba(0,0,0,0.35); min-height: auto; }
@@ -849,7 +944,11 @@
   </header>
 
   <header class="game-header" id="gameHeader" hidden>
-    <div class="leaderboard" id="leaderboard"></div>
+    <div class="control-tabs" id="controlTabs" hidden></div>
+    <div class="leaderboard-row">
+      <div class="leaderboard" id="leaderboard"></div>
+      <button class="manage-btn" id="manageBtnGame" type="button" hidden aria-label="Manage players">⚙</button>
+    </div>
   </header>
 
   <main>
@@ -953,6 +1052,7 @@
       <div class="waiting-note" id="lobbyWaitingNote"><span class="pulse"></span>Waiting for more players to join…</div>
 
       <button class="btn-primary" id="startGameBtn" type="button" hidden>Start Game</button>
+      <button class="btn-ghost" id="manageBtnLobby" type="button" hidden>Manage Players</button>
       <button class="btn-ghost" id="backTo2" type="button">← Back</button>
     </section>
 
@@ -991,6 +1091,21 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="manageModalOverlay" hidden>
+  <div class="modal-card">
+    <button class="modal-close" id="manageModalClose" type="button" aria-label="Close">✕</button>
+    <div class="modal-section-title" style="margin-top:0;">Manage players</div>
+    <div id="managePlayerList"></div>
+
+    <div class="modal-section-title">Add a local player</div>
+    <p class="modal-empty">For a friend without a phone, or a signal-dead corner of the course — you'll control them from this device too.</p>
+    <div class="add-local-form">
+      <input type="text" id="newLocalPlayerName" maxlength="16" placeholder="Player name">
+      <button class="btn-primary" id="addLocalPlayerBtn" type="button">Add</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
@@ -1011,6 +1126,29 @@ function getPlayerId(){
   return id;
 }
 const playerId = getPlayerId();
+
+// This device may control more than one player identity at once (host adding
+// local/offline players, or taking over a dropped player). activePlayerId is
+// whichever identity is currently "in the driver's seat" for score/power actions.
+let activePlayerId = playerId;
+let controlledPlayerIds = [playerId];
+
+const AVATAR_POOL = ['🥏','🏆','🔥','⚡️','🎯','🌪️','🍀','👑','🦄','🐝','🐉','🌵'];
+
+function loadControlledPlayerIds(code){
+  try {
+    const raw = localStorage.getItem('dgp-controlled-' + code);
+    const arr = raw ? JSON.parse(raw) : [];
+    if (!arr.includes(playerId)) arr.unshift(playerId);
+    return arr;
+  } catch (e) {
+    return [playerId];
+  }
+}
+function saveControlledPlayerIds(code){
+  if (!code) return;
+  localStorage.setItem('dgp-controlled-' + code, JSON.stringify(controlledPlayerIds));
+}
 
 // ---------- Powers catalog ----------
 let POWERS = [];
@@ -1037,7 +1175,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   });
 
   // ---------- Avatar picker ----------
-  const avatars = ['🥏','🏆','🔥','⚡️','🎯','🌪️','🍀','👑','🦄','🐝','🐉','🌵'];
+  const avatars = AVATAR_POOL;
   const avatarGrid = document.getElementById('avatarGrid');
   let selectedAvatar = null;
   avatars.forEach((emoji, i) => {
@@ -1066,6 +1204,8 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   const stepGame = document.getElementById('stepGame');
   const gameHeader = document.getElementById('gameHeader');
   const leaderboardEl = document.getElementById('leaderboard');
+  const manageBtnGame = document.getElementById('manageBtnGame');
+  const controlTabsEl = document.getElementById('controlTabs');
 
   function validateStep1(){
     toStep2Btn.disabled = usernameInput.value.trim().length === 0 || !selectedAvatar;
@@ -1161,6 +1301,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   const lobbySub = document.getElementById('lobbySub');
   const startHostBtn = document.getElementById('startHost');
   const startGameBtn = document.getElementById('startGameBtn');
+  const manageBtnLobby = document.getElementById('manageBtnLobby');
 
   let currentRoomCode = null;
   let stopListening = null;
@@ -1172,7 +1313,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     Object.entries(players).forEach(([id, p]) => {
       const row = document.createElement('div');
       row.className = 'lobby-player';
-      const tagParts = [id === room.hostId ? 'Host' : (id === playerId ? 'You' : '')];
+      const tagParts = [id === room.hostId ? 'Host' : (id === activePlayerId ? 'You' : (controlledPlayerIds.includes(id) ? 'Yours' : ''))];
       if (p.connected === false) tagParts.push('offline');
       row.innerHTML = `<div class="disc-chip">${p.avatar || '🥏'}</div>
         <div><div class="name">${p.name || 'Player'}</div><div class="tag">${tagParts.filter(Boolean).join(' · ')}</div></div>`;
@@ -1187,6 +1328,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       (isHost ? ' · share the code above to bring friends in' : ' · sit tight — the host will start the round shortly');
 
     startGameBtn.hidden = !isHost;
+    manageBtnLobby.hidden = !isHost;
     document.getElementById('lobbyWaitingNote').hidden = isHost && Object.keys(players).length > 1;
   }
 
@@ -1199,10 +1341,13 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
 
   function subscribeToRoom(code){
     if (stopListening) stopListening();
+    controlledPlayerIds = loadControlledPlayerIds(code);
+    activePlayerId = playerId;
     stopListening = onValue(ref(db, 'rooms/' + code), (snapshot) => {
       const room = snapshot.val();
       if (!room) return; // room was removed
       latestRoom = room;
+      if (!manageModalOverlay.hidden) renderManagePanel(room);
       if (room.status === 'playing' || room.status === 'finished') {
         enterGame(code, room);
       } else {
@@ -1287,6 +1432,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     if (stopListening) { stopListening(); stopListening = null; }
     if (currentRoomCode) {
       await remove(ref(db, `rooms/${currentRoomCode}/players/${playerId}`));
+      localStorage.removeItem('dgp-controlled-' + currentRoomCode);
       currentRoomCode = null;
       clearSavedRoom();
     }
@@ -1368,7 +1514,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     if (!currentRoomCode || !latestRoom) return;
     const hole = latestRoom.currentHole || 1;
     submitScoreBtn.disabled = true;
-    await update(ref(db, `rooms/${currentRoomCode}/scores/${hole}`), { [playerId]: scoreVal });
+    await update(ref(db, `rooms/${currentRoomCode}/scores/${hole}`), { [activePlayerId]: scoreVal });
     editingScore = false;
   });
 
@@ -1377,7 +1523,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const hole = latestRoom.currentHole || 1;
     const holeScores = (latestRoom.scores && latestRoom.scores[hole]) || {};
     editingScore = true;
-    scoreVal = holeScores[playerId] != null ? holeScores[playerId] : scoreVal;
+    scoreVal = holeScores[activePlayerId] != null ? holeScores[activePlayerId] : scoreVal;
     renderHole(currentRoomCode, latestRoom);
   });
 
@@ -1412,28 +1558,60 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       const hasActiveDisrupt = activeNow.some(fx => fx.type === 'disrupt');
 
       chip.className = 'player-chip'
-        + (id === playerId ? ' self' : '')
+        + (id === activePlayerId ? ' self' : '')
+        + (controlledPlayerIds.includes(id) && id !== activePlayerId ? ' controlled' : '')
         + (isLeader ? ' leader' : '')
         + (hasActiveHelp ? ' fx-help' : '')
         + (hasActiveDisrupt ? ' fx-disrupt' : '');
       chip.dataset.playerId = id;
+      const nameSuffix = id === activePlayerId
+        ? ' (you)'
+        : (controlledPlayerIds.includes(id) ? ' (yours)' : '');
       chip.innerHTML = `
         ${isLeader ? '<span class="crown">👑</span>' : ''}
         ${hasActiveDisrupt ? '<span class="fx-icon fx-icon-fire">🔥</span>' : ''}
         ${hasActiveHelp ? '<span class="fx-icon fx-icon-gloria">✨</span>' : ''}
         <div class="disc-chip">${p.avatar || '🥏'}</div>
         <div class="chip-points">${value}${isClassic ? '' : ' pts'}</div>
-        <div class="chip-name">${p.name || 'Player'}${id === playerId ? ' (you)' : ''}${p.connected === false ? ' · offline' : ''}</div>
+        <div class="chip-name">${p.name || 'Player'}${nameSuffix}${p.connected === false ? ' · offline' : ''}</div>
         ${previous.length ? `<div class="active-effects">${previous.map(() => '<span class="effect-dot past"></span>').join('')}</div>` : ''}
       `;
       chip.addEventListener('click', () => openPlayerModal(room, id));
       leaderboardEl.appendChild(chip);
     });
 
+    renderControlTabs(room);
+
     // keep an open modal in sync with live room updates
     if (openModalPlayerId && !playerModalOverlay.hidden) {
       openPlayerModal(room, openModalPlayerId);
     }
+  }
+
+  function renderControlTabs(room){
+    if (controlledPlayerIds.length <= 1) {
+      controlTabsEl.hidden = true;
+      controlTabsEl.innerHTML = '';
+      return;
+    }
+    controlTabsEl.hidden = false;
+    controlTabsEl.innerHTML = '';
+    controlledPlayerIds.forEach(id => {
+      const p = room.players && room.players[id];
+      if (!p) return;
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'control-tab' + (id === activePlayerId ? ' active' : '');
+      tab.innerHTML = `<span class="tab-avatar">${p.avatar || '🥏'}</span><span>${p.name || 'Player'}</span>`;
+      tab.addEventListener('click', () => {
+        if (activePlayerId === id) return;
+        activePlayerId = id;
+        renderLeaderboard(room);
+        renderHole(currentRoomCode, room);
+        renderPowersTray(room);
+      });
+      controlTabsEl.appendChild(tab);
+    });
   }
 
   function renderHole(code, room){
@@ -1447,7 +1625,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     holeLabel.textContent = `Hole ${hole} of ${totalHoles}`;
 
     const holeScores = (room.scores && room.scores[hole]) || {};
-    const mySubmittedScore = holeScores[playerId];
+    const mySubmittedScore = holeScores[activePlayerId];
     const submitted = mySubmittedScore !== undefined;
     const locked = submitted && !editingScore;
 
@@ -1471,7 +1649,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   }
 
   function renderPowersTray(room){
-    const me = room.players && room.players[playerId];
+    const me = room.players && room.players[activePlayerId];
     const myPowers = me && me.powers ? Object.entries(me.powers) : [];
     powersTray.innerHTML = '';
     myPowers.forEach(([instanceId, powerId]) => {
@@ -1525,7 +1703,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       usedCard.innerHTML = `
         <div class="power-tier">used this hole</div>
         <div class="power-name">${usedPower ? usedPower.name : 'Power'}</div>
-        <div class="power-desc">Sent to ${targetName}${lastUse.targetPlayerId === playerId ? ' (yourself)' : ''}</div>
+        <div class="power-desc">Sent to ${targetName}${lastUse.targetPlayerId === activePlayerId ? ' (yourself)' : ''}</div>
         <button class="undo-btn" type="button">↺ Undo</button>
       `;
       usedCard.querySelector('.undo-btn').addEventListener('click', undoLastPower);
@@ -1545,13 +1723,13 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
 
   async function undoLastPower(){
     if (!currentRoomCode || !latestRoom) return;
-    const me = latestRoom.players && latestRoom.players[playerId];
+    const me = latestRoom.players && latestRoom.players[activePlayerId];
     const last = me && me.lastPowerUse;
     if (!last) return;
     const updates = {};
-    updates[`players/${playerId}/powers/${last.instanceId}`] = last.powerId;
+    updates[`players/${activePlayerId}/powers/${last.instanceId}`] = last.powerId;
     updates[`players/${last.targetPlayerId}/activeEffects/${last.effectId}`] = null;
-    updates[`players/${playerId}/lastPowerUse`] = null;
+    updates[`players/${activePlayerId}/lastPowerUse`] = null;
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
     showToast('Power undone.');
   }
@@ -1569,7 +1747,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       const rect = chip.getBoundingClientRect();
       const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
       const targetId = chip.dataset.playerId;
-      const valid = (type === 'help' && targetId === playerId) || (type === 'disrupt' && targetId !== playerId);
+      const valid = (type === 'help' && targetId === activePlayerId) || (type === 'disrupt' && targetId !== activePlayerId);
       chip.classList.toggle('drop-target-valid', inside && valid);
       chip.classList.toggle('drop-target-invalid', inside && !valid);
     });
@@ -1617,7 +1795,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const chip = el ? el.closest('.player-chip') : null;
     if (!chip) return;
     const targetId = chip.dataset.playerId;
-    const valid = (drag.type === 'help' && targetId === playerId) || (drag.type === 'disrupt' && targetId !== playerId);
+    const valid = (drag.type === 'help' && targetId === activePlayerId) || (drag.type === 'disrupt' && targetId !== activePlayerId);
     if (!valid) {
       showToast("That power can't be used there.");
       return;
@@ -1631,7 +1809,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const effectId = 'fx-' + Math.random().toString(36).slice(2, 9);
     const activeHole = (latestRoom && latestRoom.currentHole) || 1;
     const updates = {};
-    updates[`players/${playerId}/powers/${instanceId}`] = null;
+    updates[`players/${activePlayerId}/powers/${instanceId}`] = null;
     updates[`players/${targetPlayerId}/activeEffects/${effectId}`] = {
       name: power ? power.name : 'Power',
       type: power ? power.type : 'help',
@@ -1641,11 +1819,11 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       appliedAt: Date.now(),
       appliedOnHole: activeHole
     };
-    updates[`players/${playerId}/lastPowerUse`] = {
+    updates[`players/${activePlayerId}/lastPowerUse`] = {
       instanceId, powerId, effectId, targetPlayerId, hole: activeHole
     };
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
-    showToast(`${power ? power.name : 'Power'} used${targetPlayerId === playerId ? ' on yourself' : ''} — active for this hole!`);
+    showToast(`${power ? power.name : 'Power'} used${targetPlayerId === activePlayerId ? ' on yourself' : ''} — active for this hole!`);
   }
 
   // ---------- Player detail modal ----------
@@ -1712,7 +1890,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       <div class="modal-header">
         <div class="disc-chip">${p.avatar || '🥏'}</div>
         <div>
-          <div class="modal-name">${p.name || 'Player'}${id === playerId ? ' (you)' : ''}</div>
+          <div class="modal-name">${p.name || 'Player'}${id === activePlayerId ? ' (you)' : (controlledPlayerIds.includes(id) ? ' (yours)' : '')}</div>
           <div class="modal-sub">${value}${isClassic ? ' strokes' : ' pts'} · ${room.hostId === id ? 'Host' : 'Player'}</div>
         </div>
       </div>
@@ -1750,6 +1928,108 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   playerModalOverlay.addEventListener('click', (e) => {
     if (e.target === playerModalOverlay) closePlayerModal();
   });
+
+  // ---------- Manage players (host only): kick, take control, add local player ----------
+  const manageModalOverlay = document.getElementById('manageModalOverlay');
+  const managePlayerList = document.getElementById('managePlayerList');
+  const newLocalPlayerName = document.getElementById('newLocalPlayerName');
+
+  function openManagePanel(){
+    if (!latestRoom) return;
+    renderManagePanel(latestRoom);
+    manageModalOverlay.hidden = false;
+  }
+  function closeManagePanel(){
+    manageModalOverlay.hidden = true;
+  }
+
+  function renderManagePanel(room){
+    managePlayerList.innerHTML = '';
+    const players = Object.entries(room.players || {});
+    players.forEach(([id, p]) => {
+      const row = document.createElement('div');
+      row.className = 'manage-row';
+      const isHostRow = id === room.hostId;
+      const isControlledByMe = controlledPlayerIds.includes(id);
+      const statusBits = [isHostRow ? 'Host' : 'Player'];
+      if (p.connected === false) statusBits.push('offline');
+      if (isControlledByMe) statusBits.push('controlled by this device');
+      row.innerHTML = `
+        <div class="disc-chip">${p.avatar || '🥏'}</div>
+        <div class="manage-info">
+          <strong>${p.name || 'Player'}</strong>
+          <span>${statusBits.join(' · ')}</span>
+        </div>
+        <div class="manage-actions">
+          ${!isControlledByMe ? `<button class="btn-mini" data-action="take" data-id="${id}">Take control</button>` : ''}
+          ${!isHostRow ? `<button class="btn-mini btn-mini-danger" data-action="kick" data-id="${id}">Kick</button>` : ''}
+        </div>
+      `;
+      managePlayerList.appendChild(row);
+    });
+
+    managePlayerList.querySelectorAll('[data-action="take"]').forEach(btn => {
+      btn.addEventListener('click', () => takeControlOf(btn.dataset.id));
+    });
+    managePlayerList.querySelectorAll('[data-action="kick"]').forEach(btn => {
+      btn.addEventListener('click', () => kickPlayer(btn.dataset.id));
+    });
+  }
+
+  function takeControlOf(id){
+    if (!currentRoomCode || controlledPlayerIds.includes(id)) return;
+    controlledPlayerIds.push(id);
+    saveControlledPlayerIds(currentRoomCode);
+    update(ref(db, `rooms/${currentRoomCode}/players/${id}`), { connected: true });
+    onDisconnect(ref(db, `rooms/${currentRoomCode}/players/${id}/connected`)).set(false);
+    activePlayerId = id;
+    if (latestRoom) {
+      renderManagePanel(latestRoom);
+      renderLeaderboard(latestRoom);
+      if (!stepGame.hidden) { renderHole(currentRoomCode, latestRoom); renderPowersTray(latestRoom); }
+    }
+    showToast(`You're now controlling ${(latestRoom.players[id] && latestRoom.players[id].name) || 'that player'}.`);
+  }
+
+  async function kickPlayer(id){
+    if (!currentRoomCode || !latestRoom) return;
+    if (id === latestRoom.hostId) { showToast("Can't kick the host."); return; }
+    await remove(ref(db, `rooms/${currentRoomCode}/players/${id}`));
+    if (controlledPlayerIds.includes(id)) {
+      controlledPlayerIds = controlledPlayerIds.filter(cid => cid !== id);
+      saveControlledPlayerIds(currentRoomCode);
+      if (activePlayerId === id) activePlayerId = playerId;
+    }
+    showToast('Player removed.');
+  }
+
+  async function addLocalPlayer(){
+    if (!currentRoomCode) return;
+    const name = newLocalPlayerName.value.trim();
+    if (!name) return;
+    const newId = 'p-' + Math.random().toString(36).slice(2, 10);
+    const usedAvatars = latestRoom && latestRoom.players ? Object.values(latestRoom.players).map(p => p.avatar) : [];
+    const avatar = AVATAR_POOL.find(a => !usedAvatars.includes(a)) || AVATAR_POOL[Math.floor(Math.random() * AVATAR_POOL.length)];
+
+    await update(ref(db, `rooms/${currentRoomCode}/players/${newId}`), {
+      name, avatar, points: 0, connected: true, joinedAt: serverTimestamp()
+    });
+    onDisconnect(ref(db, `rooms/${currentRoomCode}/players/${newId}/connected`)).set(false);
+
+    controlledPlayerIds.push(newId);
+    saveControlledPlayerIds(currentRoomCode);
+    activePlayerId = newId;
+    newLocalPlayerName.value = '';
+    showToast(`${name} added — you're now controlling them.`);
+  }
+
+  document.getElementById('manageBtnLobby').addEventListener('click', openManagePanel);
+  manageBtnGame.addEventListener('click', openManagePanel);
+  document.getElementById('manageModalClose').addEventListener('click', closeManagePanel);
+  manageModalOverlay.addEventListener('click', (e) => {
+    if (e.target === manageModalOverlay) closeManagePanel();
+  });
+  document.getElementById('addLocalPlayerBtn').addEventListener('click', addLocalPlayer);
 
   async function maybeResolveHole(code, room){
     if (room.hostId !== playerId) return; // only the host resolves, avoids double-writes
@@ -1809,6 +2089,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     gameHeader.hidden = false;
     stepGame.hidden = false;
 
+    manageBtnGame.hidden = room.hostId !== playerId;
     renderLeaderboard(room);
     renderPowersTray(room);
 
