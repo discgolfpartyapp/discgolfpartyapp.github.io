@@ -615,19 +615,65 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .player-chip .active-effects{
-    display: flex;
-    gap: 3px;
-    margin-top: 1px;
+
+  /* ---------- Hole transition sequence ---------- */
+  @keyframes points-pop{
+    0%{ transform: scale(1); }
+    35%{ transform: scale(1.35); color: var(--accent-gold); }
+    100%{ transform: scale(1); }
   }
-  .effect-dot{
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--accent-coral);
+  .chip-points.points-pop{
+    display: inline-block;
+    animation: points-pop 0.5s ease;
   }
-  .effect-dot.past{
-    background: var(--ink-muted);
-    opacity: 0.5;
+
+  @keyframes hole-swipe{
+    0%{ transform: translateX(0); opacity: 1; }
+    35%{ transform: translateX(-22px); opacity: 0; }
+    36%{ transform: translateX(22px); opacity: 0; }
+    100%{ transform: translateX(0); opacity: 1; }
+  }
+  .hole-swipe{
+    animation: hole-swipe 0.5s ease;
+  }
+
+  @keyframes power-pop-common{
+    0%{ transform: scale(0) rotate(0deg); opacity: 0; }
+    70%{ transform: scale(1.08) rotate(2deg); opacity: 1; }
+    100%{ transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  @keyframes power-pop-rare{
+    0%{ transform: scale(0) rotate(-15deg); opacity: 0; }
+    50%{ transform: scale(1.15) rotate(8deg); opacity: 1; }
+    75%{ transform: scale(0.95) rotate(-4deg); }
+    100%{ transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  @keyframes power-pop-legendary{
+    0%{ transform: scale(0) rotate(-30deg) translateY(20px); opacity: 0; filter: brightness(1.7); }
+    30%{ transform: scale(1.25) rotate(15deg) translateY(-6px); opacity: 1; }
+    50%{ transform: scale(0.9) rotate(-10deg) translateY(3px); }
+    70%{ transform: scale(1.1) rotate(6deg); }
+    85%{ transform: scale(0.97) rotate(-3deg); }
+    100%{ transform: scale(1) rotate(0deg) translateY(0); opacity: 1; filter: brightness(1); }
+  }
+  .power-card.entrance-common{ animation: power-pop-common 0.4s ease; }
+  .power-card.entrance-rare{ animation: power-pop-rare 0.55s ease; }
+  .power-card.entrance-legendary{ animation: power-pop-legendary 0.8s cubic-bezier(.36,.07,.19,.97); }
+
+  @keyframes event-drop-in{
+    0%{ transform: translateY(-70px); opacity: 0; }
+    60%{ transform: translateY(8px); opacity: 1; }
+    80%{ transform: translateY(-4px); }
+    100%{ transform: translateY(0); opacity: 1; }
+  }
+  .hole-event-banner.drop-in{
+    animation: event-drop-in 0.5s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .chip-points.points-pop, .hole-swipe, .power-card.entrance-common,
+    .power-card.entrance-rare, .power-card.entrance-legendary, .hole-event-banner.drop-in{
+      animation: none;
+    }
   }
 
   /* ---------- Active power animations ---------- */
@@ -737,12 +783,26 @@
     font-family: var(--font-display);
     font-size: 1rem;
     margin: 0 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
+  .info-toggle{
+    border: none;
+    background: none;
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 2px;
+    line-height: 1;
+  }
+  .info-toggle.active{ color: var(--accent-teal); }
   .powers-section .sub{
     font-size: 0.8rem;
     color: var(--ink-muted);
     margin: 0 0 12px;
   }
+  .powers-section .sub[hidden]{ display: none; }
   .powers-tray{
     display: flex;
     gap: 10px;
@@ -1226,29 +1286,31 @@
 
     <!-- STEP 4: Live Game -->
     <section class="card step" id="stepGame" hidden>
-      <div class="hole-indicator" id="holeLabel">Hole 1 of 9</div>
+      <div id="holeSwipeZone">
+        <div class="hole-indicator" id="holeLabel">Hole 1 of 9</div>
 
-      <div class="hole-event-banner" id="holeEventBanner" hidden>
-        <div class="hole-event-label">⚡ Hole Event</div>
-        <div class="hole-event-name" id="holeEventName"></div>
-        <div class="hole-event-desc" id="holeEventDesc"></div>
-      </div>
-
-      <div class="score-entry" id="scoreEntry">
-        <label>Your score this hole</label>
-        <div class="score-stepper">
-          <button id="scoreMinus" type="button" aria-label="Decrease score">−</button>
-          <div class="score-value" id="scoreValue">3</div>
-          <button id="scorePlus" type="button" aria-label="Increase score">+</button>
+        <div class="hole-event-banner" id="holeEventBanner" hidden>
+          <div class="hole-event-label">⚡ Hole Event</div>
+          <div class="hole-event-name" id="holeEventName"></div>
+          <div class="hole-event-desc" id="holeEventDesc"></div>
         </div>
-        <button class="btn-primary" id="submitScore" type="button">Submit Score</button>
-        <button class="btn-ghost" id="editScoreBtn" type="button" hidden>Edit my score</button>
-        <p class="waiting-note" id="scoreWaitingNote" hidden><span class="pulse"></span>Waiting on <span id="waitingNames"></span>…</p>
+
+        <div class="score-entry" id="scoreEntry">
+          <label>Your score this hole</label>
+          <div class="score-stepper">
+            <button id="scoreMinus" type="button" aria-label="Decrease score">−</button>
+            <div class="score-value" id="scoreValue">3</div>
+            <button id="scorePlus" type="button" aria-label="Increase score">+</button>
+          </div>
+          <button class="btn-primary" id="submitScore" type="button">Submit Score</button>
+          <button class="btn-ghost" id="editScoreBtn" type="button" hidden>Edit my score</button>
+          <p class="waiting-note" id="scoreWaitingNote" hidden><span class="pulse"></span>Waiting on <span id="waitingNames"></span>…</p>
+        </div>
       </div>
 
       <div class="powers-section">
-        <h3>Your Powers</h3>
-        <p class="sub">Drag a power onto a player above to use it. Help powers only work on yourself — disrupt powers only work on opponents.</p>
+        <h3>Your Powers <button class="info-toggle" id="powersInfoToggle" type="button" aria-label="Toggle help text">ⓘ</button></h3>
+        <p class="sub" id="powersHelpText">Drag a power onto a player above to use it. Help powers only work on yourself — disrupt powers only work on opponents.</p>
         <div class="powers-tray" id="powersTray"></div>
       </div>
     </section>
@@ -1326,6 +1388,9 @@ const playerId = getPlayerId();
 // whichever identity is currently "in the driver's seat" for score/power actions.
 let activePlayerId = playerId;
 let controlledPlayerIds = [playerId];
+let playersUsedPower = new Set(); // players (on this device) who've used a power this round — auto-hides the help text
+let lastPowerInstanceIds = new Set(); // instance ids seen on the last render — used to detect newly-awarded powers for entrance animation
+let powersHelpOverride = {}; // manual (i) toggle override per player id, wins over the auto behavior
 
 const AVATAR_POOL = ['🥏','🏆','🔥','⚡️','🎯','🌪️','🍀','👑','🦄','🐝','🐉','🌵'];
 
@@ -1653,6 +1718,9 @@ function pickRandomPower(settings){
     if (stopListening) stopListening();
     controlledPlayerIds = loadControlledPlayerIds(code);
     activePlayerId = playerId;
+    playersUsedPower = new Set();
+    powersHelpOverride = {};
+    lastPowerInstanceIds = new Set();
     stopListening = onValue(ref(db, 'rooms/' + code), (snapshot) => {
       const room = snapshot.val();
       if (!room) {
@@ -1858,6 +1926,13 @@ function pickRandomPower(settings){
     }, 2200);
   }
 
+  function triggerAnimation(el, className){
+    if (!el) return;
+    el.classList.remove(className);
+    void el.offsetWidth; // force reflow so the animation restarts even if the class was already applied
+    el.classList.add(className);
+  }
+
   // ---------- Live game ----------
   const holeLabel = document.getElementById('holeLabel');
   const scoreValueEl = document.getElementById('scoreValue');
@@ -1907,7 +1982,7 @@ function pickRandomPower(settings){
     return total;
   }
 
-  function renderLeaderboard(room){
+  function renderLeaderboard(room, holeChanged){
     const isClassic = !!(room.settings && room.settings.classicScoring);
     const players = Object.entries(room.players || {});
     const ranked = players.map(([id, p]) => ({
@@ -1924,7 +1999,6 @@ function pickRandomPower(settings){
       const isLeader = ranked.length > 1 && value === bestValue;
       const allEffects = p.activeEffects ? Object.values(p.activeEffects) : [];
       const activeNow = allEffects.filter(fx => (fx.appliedOnHole || 1) === currentHole);
-      const previous = allEffects.filter(fx => (fx.appliedOnHole || 1) !== currentHole);
       const hasActiveHelp = activeNow.some(fx => fx.type === 'help');
       const hasActiveDisrupt = activeNow.some(fx => fx.type === 'disrupt');
 
@@ -1944,10 +2018,10 @@ function pickRandomPower(settings){
         <div class="disc-chip${isActive ? ' self-ring' : ''}">${p.avatar || '🥏'}${isActive ? '<span class="avatar-badge">✓</span>' : ''}${isControlledOnly ? '<span class="avatar-badge controlled-only"></span>' : ''}</div>
         <div class="chip-points">${value}${isClassic ? '' : ' pts'}</div>
         <div class="chip-name">${p.name || 'Player'}${p.left ? ' · left' : (p.connected === false ? ' · offline' : '')}</div>
-        ${previous.length ? `<div class="active-effects">${previous.map(() => '<span class="effect-dot past"></span>').join('')}</div>` : ''}
       `;
       chip.addEventListener('click', () => openPlayerModal(room, id));
       leaderboardEl.appendChild(chip);
+      if (holeChanged) triggerAnimation(chip.querySelector('.chip-points'), 'points-pop');
     });
 
     renderControlTabs(room);
@@ -1984,7 +2058,9 @@ function pickRandomPower(settings){
     });
   }
 
-  function renderHole(code, room){
+  const EVENT_DROP_DELAY_MS = 1100; // let the points-pop / swipe / power-entrance settle first
+
+  function renderHole(code, room, holeChanged){
     const hole = room.currentHole || 1;
     if (hole !== lastRenderedHole) {
       scoreVal = 3;
@@ -1994,13 +2070,24 @@ function pickRandomPower(settings){
     const totalHoles = (room.settings && room.settings.holes) || 9;
     holeLabel.textContent = `Hole ${hole} of ${totalHoles}`;
 
+    if (holeChanged) triggerAnimation(document.getElementById('holeSwipeZone'), 'hole-swipe');
+
     const eventId = room.holeEvents && room.holeEvents[hole];
     const event = eventId ? getEvent(eventId) : null;
     const holeEventBanner = document.getElementById('holeEventBanner');
     if (event) {
       document.getElementById('holeEventName').textContent = event.name;
       document.getElementById('holeEventDesc').textContent = event.description;
-      holeEventBanner.hidden = false;
+      if (holeChanged) {
+        holeEventBanner.hidden = true;
+        setTimeout(() => {
+          holeEventBanner.hidden = false;
+          triggerAnimation(holeEventBanner, 'drop-in');
+        }, EVENT_DROP_DELAY_MS);
+      } else {
+        holeEventBanner.classList.remove('drop-in');
+        holeEventBanner.hidden = false;
+      }
     } else {
       holeEventBanner.hidden = true;
     }
@@ -2032,7 +2119,7 @@ function pickRandomPower(settings){
   let pendingTrayRoom = null;
   let dragGestureActive = false;
 
-  function renderPowersTray(room){
+  function renderPowersTray(room, holeChanged){
     if (dragGestureActive) {
       // rebuilding now would delete the card mid-gesture and orphan its ghost —
       // defer the render until the drag finishes, then catch up
@@ -2041,12 +2128,16 @@ function pickRandomPower(settings){
     }
     const me = room.players && room.players[activePlayerId];
     const myPowers = me && me.powers ? Object.entries(me.powers) : [];
+    const newInstanceIds = holeChanged
+      ? myPowers.filter(([instanceId]) => !lastPowerInstanceIds.has(instanceId)).map(([instanceId]) => instanceId)
+      : [];
     powersTray.innerHTML = '';
     myPowers.forEach(([instanceId, powerId]) => {
       const power = getPower(powerId);
       if (!power) return;
+      const isNew = newInstanceIds.includes(instanceId);
       const card = document.createElement('div');
-      card.className = `power-card type-${power.type} tier-${power.tier}`;
+      card.className = `power-card type-${power.type} tier-${power.tier}` + (isNew ? ` entrance-${power.tier}` : '');
       card.innerHTML = `
         <div class="power-tier">${power.tier} · ${power.type}</div>
         <div class="power-name">${power.name}</div>
@@ -2118,7 +2209,26 @@ function pickRandomPower(settings){
         : 'Empty slot';
       powersTray.appendChild(slot);
     }
+
+    lastPowerInstanceIds = new Set(myPowers.map(([instanceId]) => instanceId));
+    updatePowersHelpVisibility();
   }
+
+  function updatePowersHelpVisibility(){
+    const helpText = document.getElementById('powersHelpText');
+    const toggle = document.getElementById('powersInfoToggle');
+    const visible = Object.prototype.hasOwnProperty.call(powersHelpOverride, activePlayerId)
+      ? powersHelpOverride[activePlayerId]
+      : !playersUsedPower.has(activePlayerId);
+    helpText.hidden = !visible;
+    toggle.classList.toggle('active', visible);
+  }
+
+  document.getElementById('powersInfoToggle').addEventListener('click', () => {
+    const currentlyVisible = !document.getElementById('powersHelpText').hidden;
+    powersHelpOverride[activePlayerId] = !currentlyVisible;
+    updatePowersHelpVisibility();
+  });
 
   async function undoLastPower(){
     if (!currentRoomCode || !latestRoom) return;
@@ -2216,22 +2326,25 @@ function pickRandomPower(settings){
     const power = getPower(powerId);
     const effectId = 'fx-' + Math.random().toString(36).slice(2, 9);
     const activeHole = (latestRoom && latestRoom.currentHole) || 1;
+    const actingPlayerId = activePlayerId;
     const updates = {};
-    updates[`players/${activePlayerId}/powers/${instanceId}`] = null;
+    updates[`players/${actingPlayerId}/powers/${instanceId}`] = null;
     updates[`players/${targetPlayerId}/activeEffects/${effectId}`] = {
       name: power ? power.name : 'Power',
       type: power ? power.type : 'help',
       tier: power ? power.tier : 'common',
       description: power ? power.description : '',
-      from: playerId,
+      from: actingPlayerId,
       appliedAt: Date.now(),
       appliedOnHole: activeHole
     };
-    updates[`players/${activePlayerId}/lastPowerUse`] = {
+    updates[`players/${actingPlayerId}/lastPowerUse`] = {
       instanceId, powerId, effectId, targetPlayerId, hole: activeHole
     };
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
-    showToast(`${power ? power.name : 'Power'} used${targetPlayerId === activePlayerId ? ' on yourself' : ''} — active for this hole!`);
+    playersUsedPower.add(actingPlayerId);
+    updatePowersHelpVisibility();
+    showToast(`${power ? power.name : 'Power'} used${targetPlayerId === actingPlayerId ? ' on yourself' : ''} — active for this hole!`);
   }
 
   // ---------- Player detail modal ----------
@@ -2663,11 +2776,14 @@ function pickRandomPower(settings){
     gameHeader.hidden = false;
     stepGame.hidden = false;
 
+    const hole = room.currentHole || 1;
+    const holeChanged = lastRenderedHole !== null && hole !== lastRenderedHole;
+
     manageBtnGame.hidden = false;
-    renderLeaderboard(room);
-    renderPowersTray(room);
+    renderLeaderboard(room, holeChanged);
+    renderPowersTray(room, holeChanged);
     document.getElementById('scoreEntry').hidden = false;
-    renderHole(code, room);
+    renderHole(code, room, holeChanged);
     maybeResolveHole(code, room);
   }
 
