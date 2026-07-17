@@ -544,12 +544,42 @@
   }
   .player-chip.leader{ border-color: var(--accent-gold); }
   .player-chip.self{
-    box-shadow: 0 0 0 2px var(--accent-teal);
-    background: color-mix(in srgb, var(--accent-teal) 14%, var(--bg-elevated));
+    background: color-mix(in srgb, var(--accent-teal) 10%, var(--bg-elevated));
   }
   .player-chip.controlled{
-    box-shadow: 0 0 0 1.5px var(--accent-teal);
-    opacity: 0.85;
+    opacity: 0.9;
+  }
+  .chip-corner{
+    position: absolute;
+    width: 11px; height: 11px;
+    border: 0 solid var(--accent-teal);
+    pointer-events: none;
+  }
+  .chip-corner-tl{ top: -3px; left: -3px; border-top-width: 2px; border-left-width: 2px; border-radius: 6px 0 0 0; }
+  .chip-corner-tr{ top: -3px; right: -3px; border-top-width: 2px; border-right-width: 2px; border-radius: 0 6px 0 0; }
+  .chip-corner-bl{ bottom: -3px; left: -3px; border-bottom-width: 2px; border-left-width: 2px; border-radius: 0 0 0 6px; }
+  .chip-corner-br{ bottom: -3px; right: -3px; border-bottom-width: 2px; border-right-width: 2px; border-radius: 0 0 6px 0; }
+  .self-badge{
+    position: absolute;
+    bottom: -4px; right: -4px;
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: var(--accent-teal);
+    color: var(--accent-teal-ink);
+    font-size: 0.58rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px var(--bg-elevated);
+  }
+  .controlled-dot{
+    position: absolute;
+    bottom: -3px; right: -3px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-teal);
+    background: var(--bg-elevated);
   }
   .player-chip{ cursor: pointer; }
   .player-chip .crown{
@@ -880,6 +910,64 @@
   .stat-box .stat-value{ font-family: var(--font-mono); font-weight: 700; font-size: 1.15rem; }
   .stat-box .stat-label{ font-size: 0.68rem; color: var(--ink-muted); margin-top: 2px; }
 
+  /* ---------- Round summary ---------- */
+  .summary-standings{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0 22px;
+  }
+  .summary-standing-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+  }
+  .summary-standing-row.champion{
+    border-color: var(--accent-gold);
+    background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--accent-gold) 16%, var(--surface)));
+  }
+  .summary-standing-row .standing-rank{
+    font-family: var(--font-mono);
+    font-weight: 700;
+    width: 20px;
+    text-align: center;
+    color: var(--ink-muted);
+    flex-shrink: 0;
+  }
+  .summary-standing-row .disc-chip{ width: 36px; height: 36px; font-size: 0.95rem; flex-shrink: 0; }
+  .summary-standing-row .standing-info{ flex: 1; min-width: 0; }
+  .summary-standing-row .standing-info strong{ display: block; font-size: 0.88rem; }
+  .summary-standing-row .standing-info span{ font-size: 0.72rem; color: var(--ink-muted); }
+  .summary-standing-row .standing-value{
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+  .fun-stat-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.84rem;
+  }
+  .fun-stat-row:last-child{ border-bottom: none; }
+  .fun-stat-label{ color: var(--ink-muted); }
+  .fun-stat-value{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .fun-stat-avatar{ font-size: 1rem; }
+
   /* ---------- Manage players panel ---------- */
   .manage-row{
     display: flex;
@@ -1079,6 +1167,14 @@
       </div>
     </section>
 
+    <!-- STEP 5: Round summary -->
+    <section class="card step" id="stepSummary" hidden>
+      <div class="step-eyebrow"><span class="dot"></span>Round complete</div>
+      <div id="summaryContent"></div>
+      <button class="btn-primary" id="exitToHomeBtn" type="button">Exit to Home</button>
+      <button class="btn-ghost" id="endRoundBtn" type="button" hidden>End Round &amp; Clear Data</button>
+    </section>
+
   </main>
 
   <footer>Prototype build — running locally via GitHub Pages</footer>
@@ -1202,6 +1298,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
   const stepLobby = document.getElementById('stepLobby');
   const heroSection = document.getElementById('heroSection');
   const stepGame = document.getElementById('stepGame');
+  const stepSummary = document.getElementById('stepSummary');
   const gameHeader = document.getElementById('gameHeader');
   const leaderboardEl = document.getElementById('leaderboard');
   const manageBtnGame = document.getElementById('manageBtnGame');
@@ -1345,7 +1442,14 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     activePlayerId = playerId;
     stopListening = onValue(ref(db, 'rooms/' + code), (snapshot) => {
       const room = snapshot.val();
-      if (!room) return; // room was removed
+      if (!room) {
+        // room was deleted (round ended & cleared, or expired) while we were watching it
+        if (currentRoomCode === code) {
+          showToast('This game has ended and its data was cleared.');
+          resetToHome();
+        }
+        return;
+      }
       latestRoom = room;
       if (!manageModalOverlay.hidden) renderManagePanel(room);
       if (room.status === 'playing' || room.status === 'finished') {
@@ -1363,15 +1467,24 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     stepLobby.hidden = false;
   }
 
+  const ROOM_TTL_MS = 24 * 60 * 60 * 1000; // rooms older than this are treated as abandoned
+  function isRoomStale(room){
+    return !!room.createdAt && (Date.now() - room.createdAt) > ROOM_TTL_MS;
+  }
+
   async function createRoom(){
     startHostBtn.disabled = true;
     startHostBtn.textContent = 'Creating…';
 
     let code = document.getElementById('generatedCode').textContent;
-    // avoid clobbering a code that's already taken
+    // avoid clobbering a code that's already taken — and sweep up any stale room we happen to land on
     for (let i = 0; i < 5; i++){
       const snap = await get(ref(db, 'rooms/' + code));
       if (!snap.exists()) break;
+      if (isRoomStale(snap.val())) {
+        await remove(ref(db, 'rooms/' + code));
+        break;
+      }
       code = generateCode();
       document.getElementById('generatedCode').textContent = code;
     }
@@ -1406,7 +1519,8 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     joinError.hidden = true;
 
     const snap = await get(ref(db, 'rooms/' + code));
-    if (!snap.exists()) {
+    if (!snap.exists() || isRoomStale(snap.val())) {
+      if (snap.exists()) await remove(ref(db, 'rooms/' + code));
       joinError.hidden = false;
       startJoinBtn.disabled = false;
       startJoinBtn.textContent = 'Join Lobby';
@@ -1457,6 +1571,11 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     const snap = await get(ref(db, 'rooms/' + savedCode));
     if (!snap.exists()) { clearSavedRoom(); return; }
     const room = snap.val();
+    if (isRoomStale(room)) {
+      await remove(ref(db, 'rooms/' + savedCode));
+      clearSavedRoom();
+      return;
+    }
     const existingPlayer = room.players && room.players[playerId];
 
     if (existingPlayer) {
@@ -1564,13 +1683,15 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
         + (hasActiveHelp ? ' fx-help' : '')
         + (hasActiveDisrupt ? ' fx-disrupt' : '');
       chip.dataset.playerId = id;
-      const nameSuffix = id === activePlayerId
-        ? ' (you)'
-        : (controlledPlayerIds.includes(id) ? ' (yours)' : '');
+      const isActive = id === activePlayerId;
+      const isControlledOnly = !isActive && controlledPlayerIds.includes(id);
+      const nameSuffix = isControlledOnly ? ' (yours)' : '';
       chip.innerHTML = `
         ${isLeader ? '<span class="crown">👑</span>' : ''}
         ${hasActiveDisrupt ? '<span class="fx-icon fx-icon-fire">🔥</span>' : ''}
         ${hasActiveHelp ? '<span class="fx-icon fx-icon-gloria">✨</span>' : ''}
+        ${isActive ? '<span class="chip-corner chip-corner-tl"></span><span class="chip-corner chip-corner-tr"></span><span class="chip-corner chip-corner-bl"></span><span class="chip-corner chip-corner-br"></span><span class="self-badge">✓</span>' : ''}
+        ${isControlledOnly ? '<span class="controlled-dot"></span>' : ''}
         <div class="disc-chip">${p.avatar || '🥏'}</div>
         <div class="chip-points">${value}${isClassic ? '' : ' pts'}</div>
         <div class="chip-name">${p.name || 'Player'}${nameSuffix}${p.connected === false ? ' · offline' : ''}</div>
@@ -1648,7 +1769,16 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
     }
   }
 
+  let pendingTrayRoom = null;
+  let dragGestureActive = false;
+
   function renderPowersTray(room){
+    if (dragGestureActive) {
+      // rebuilding now would delete the card mid-gesture and orphan its ghost —
+      // defer the render until the drag finishes, then catch up
+      pendingTrayRoom = room;
+      return;
+    }
     const me = room.players && room.players[activePlayerId];
     const myPowers = me && me.powers ? Object.entries(me.powers) : [];
     powersTray.innerHTML = '';
@@ -1666,6 +1796,7 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
         const startX = e.clientX;
         const startY = e.clientY;
         let lifted = false;
+        dragGestureActive = true;
 
         function onPreMove(ev){
           if (ev.pointerId !== e.pointerId) return;
@@ -1683,6 +1814,14 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
           card.removeEventListener('pointermove', onPreMove);
           card.removeEventListener('pointerup', onPreEnd);
           card.removeEventListener('pointercancel', onPreEnd);
+          if (!lifted) {
+            dragGestureActive = false;
+            if (pendingTrayRoom) {
+              const room = pendingTrayRoom;
+              pendingTrayRoom = null;
+              renderPowersTray(room);
+            }
+          }
         }
         card.addEventListener('pointermove', onPreMove);
         card.addEventListener('pointerup', onPreEnd);
@@ -1787,20 +1926,29 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
 
   async function finishDrag(x, y, drag){
     activeDrag = null;
+    dragGestureActive = false;
     drag.card.classList.remove('dragging');
     drag.ghost.remove();
     document.querySelectorAll('.player-chip').forEach(c => c.classList.remove('drop-target-valid', 'drop-target-invalid'));
 
-    const el = document.elementFromPoint(x, y);
-    const chip = el ? el.closest('.player-chip') : null;
-    if (!chip) return;
-    const targetId = chip.dataset.playerId;
-    const valid = (drag.type === 'help' && targetId === activePlayerId) || (drag.type === 'disrupt' && targetId !== activePlayerId);
-    if (!valid) {
-      showToast("That power can't be used there.");
-      return;
+    try {
+      const el = document.elementFromPoint(x, y);
+      const chip = el ? el.closest('.player-chip') : null;
+      if (!chip) return;
+      const targetId = chip.dataset.playerId;
+      const valid = (drag.type === 'help' && targetId === activePlayerId) || (drag.type === 'disrupt' && targetId !== activePlayerId);
+      if (!valid) {
+        showToast("That power can't be used there.");
+        return;
+      }
+      await usePower(drag.instanceId, drag.powerId, targetId);
+    } finally {
+      if (pendingTrayRoom) {
+        const room = pendingTrayRoom;
+        pendingTrayRoom = null;
+        renderPowersTray(room);
+      }
     }
-    await usePower(drag.instanceId, drag.powerId, targetId);
   }
 
   async function usePower(instanceId, powerId, targetPlayerId){
@@ -2076,31 +2224,147 @@ function randomPower(){ return POWERS.length ? POWERS[Math.floor(Math.random() *
       updates.currentHole = hole + 1;
     } else {
       updates.status = 'finished';
+      updates.finishedAt = serverTimestamp();
     }
 
     await update(ref(db, `rooms/${code}`), updates);
   }
+
+  // ---------- Round summary ----------
+  function computeRoundSummary(room){
+    const players = Object.entries(room.players || {});
+    const isClassic = !!(room.settings && room.settings.classicScoring);
+
+    const standings = players.map(([id, p]) => ({
+      id, p,
+      value: isClassic ? totalStrokes(room, id) : (p.points || 0),
+      strokes: totalStrokes(room, id)
+    }));
+    standings.sort((a, b) => isClassic ? a.value - b.value : b.value - a.value);
+
+    const allEffects = [];
+    players.forEach(([pid, p]) => {
+      Object.values(p.activeEffects || {}).forEach(fx => allEffects.push({ targetId: pid, ...fx }));
+    });
+
+    const givenCounts = {};
+    const disruptReceivedCounts = {};
+    allEffects.forEach(fx => {
+      if (fx.from) givenCounts[fx.from] = (givenCounts[fx.from] || 0) + 1;
+      if (fx.type === 'disrupt') disruptReceivedCounts[fx.targetId] = (disruptReceivedCounts[fx.targetId] || 0) + 1;
+    });
+
+    function topOf(counts){
+      let bestId = null, bestCount = 0;
+      Object.entries(counts).forEach(([id, count]) => { if (count > bestCount) { bestCount = count; bestId = id; } });
+      return bestId ? { id: bestId, count: bestCount } : null;
+    }
+
+    let bestGolf = null;
+    standings.forEach(s => {
+      if (s.strokes > 0 && (!bestGolf || s.strokes < bestGolf.strokes)) bestGolf = s;
+    });
+
+    return {
+      standings, isClassic,
+      mostPowersUsed: topOf(givenCounts),
+      mostDisrupted: topOf(disruptReceivedCounts),
+      bestGolf,
+      totalPowersUsed: allEffects.length
+    };
+  }
+
+  function funStatRow(label, entry, room, unit){
+    if (!entry) return `<div class="fun-stat-row"><span class="fun-stat-label">${label}</span><span class="fun-stat-value">—</span></div>`;
+    const p = room.players[entry.id] || {};
+    return `
+      <div class="fun-stat-row">
+        <span class="fun-stat-label">${label}</span>
+        <span class="fun-stat-value"><span class="fun-stat-avatar">${p.avatar || '🥏'}</span>${p.name || 'Player'} (${entry.count} ${unit})</span>
+      </div>
+    `;
+  }
+
+  function renderSummary(code, room){
+    const summary = computeRoundSummary(room);
+    const winner = summary.standings[0];
+
+    const standingsHtml = summary.standings.map((s, i) => `
+      <div class="summary-standing-row ${i === 0 ? 'champion' : ''}">
+        <span class="standing-rank">${i + 1}</span>
+        <div class="disc-chip">${s.p.avatar || '🥏'}</div>
+        <div class="standing-info">
+          <strong>${s.p.name || 'Player'}</strong>
+          <span>${s.strokes} strokes</span>
+        </div>
+        <div class="standing-value">${s.value}${summary.isClassic ? '' : ' pts'}</div>
+      </div>
+    `).join('');
+
+    const bestGolfHtml = summary.bestGolf
+      ? funStatRow('Best golf score', { id: summary.bestGolf.id, count: summary.bestGolf.strokes }, room, 'strokes')
+      : funStatRow('Best golf score', null, room);
+
+    document.getElementById('summaryContent').innerHTML = `
+      <h2>🏆 ${winner ? (winner.p.name || 'Player') : 'Nobody'} wins the round!</h2>
+      <div class="summary-standings">${standingsHtml}</div>
+      <div class="modal-section-title">Fun stats</div>
+      ${bestGolfHtml}
+      ${funStatRow('Most powers used', summary.mostPowersUsed, room, 'used')}
+      ${funStatRow('Most disrupted', summary.mostDisrupted, room, 'times')}
+      <div class="fun-stat-row"><span class="fun-stat-label">Total powers in play</span><span class="fun-stat-value">${summary.totalPowersUsed}</span></div>
+    `;
+
+    document.getElementById('endRoundBtn').hidden = room.hostId !== playerId;
+  }
+
+  function resetToHome(){
+    if (stopListening) { stopListening(); stopListening = null; }
+    currentRoomCode = null;
+    latestRoom = null;
+    closePlayerModal();
+    closeManagePanel();
+    clearSavedRoom();
+    stepGame.hidden = true;
+    gameHeader.hidden = true;
+    stepSummary.hidden = true;
+    stepLobby.hidden = true;
+    stepMode.hidden = true;
+    heroSection.hidden = false;
+    stepIdentity.hidden = false;
+  }
+
+  document.getElementById('exitToHomeBtn').addEventListener('click', resetToHome);
+  document.getElementById('endRoundBtn').addEventListener('click', async () => {
+    if (!currentRoomCode) return;
+    await remove(ref(db, 'rooms/' + currentRoomCode));
+    resetToHome();
+  });
 
   function enterGame(code, room){
     stepIdentity.hidden = true;
     stepMode.hidden = true;
     stepLobby.hidden = true;
     heroSection.hidden = true;
+
+    if (room.status === 'finished') {
+      gameHeader.hidden = true;
+      stepGame.hidden = true;
+      stepSummary.hidden = false;
+      renderSummary(code, room);
+      return;
+    }
+
+    stepSummary.hidden = true;
     gameHeader.hidden = false;
     stepGame.hidden = false;
 
     manageBtnGame.hidden = room.hostId !== playerId;
     renderLeaderboard(room);
     renderPowersTray(room);
-
-    if (room.status === 'finished') {
-      holeLabel.textContent = 'Round complete! 🏆';
-      document.getElementById('scoreEntry').hidden = true;
-    } else {
-      document.getElementById('scoreEntry').hidden = false;
-      renderHole(code, room);
-      maybeResolveHole(code, room);
-    }
+    document.getElementById('scoreEntry').hidden = false;
+    renderHole(code, room);
+    maybeResolveHole(code, room);
   }
 
   attemptRejoin();
