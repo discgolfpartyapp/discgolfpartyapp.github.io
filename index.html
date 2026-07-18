@@ -3092,13 +3092,17 @@ function pickRandomPower(settings){
 
     players.forEach(id => {
       const original = room.players[id].powerSlots || [];
-      const slots = [0, 1, 2].map(i => {
+      const cleared = [0, 1, 2].map(i => {
         const s = original[i];
         if (!s) return { state: 'empty' };
         // a slot used during the hole that just resolved is now fully spent — free it up
         if (s.state === 'used' && s.hole === hole) return { state: 'empty' };
         return s;
       });
+
+      // left-align remaining held powers so a freed-up slot never leaves a gap in the middle
+      const held = cleared.filter(s => s.state === 'held');
+      const slots = held.concat(Array.from({ length: 3 - held.length }, () => ({ state: 'empty' })));
 
       if (!winners.includes(id)) {
         const slotIndex = slots.findIndex(s => s.state === 'empty');
