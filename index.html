@@ -749,7 +749,7 @@
     color: var(--ink-muted);
     line-height: 1.4;
   }
-  .score-entry{ text-align: center; }
+  .score-entry{ text-align: center; margin-top: 22px; }
   .score-entry label{ text-align: center; margin-bottom: 4px; }
   .score-stepper{
     display: flex;
@@ -779,7 +779,7 @@
   }
 
   /* ---------- Powers ---------- */
-  .powers-section{ margin-top: 22px; }
+  .powers-section{ margin-top: 0; }
   .powers-section h3{
     font-family: var(--font-display);
     font-size: 1rem;
@@ -1070,6 +1070,57 @@
   }
   .fun-stat-avatar{ font-size: 1rem; }
 
+  /* ---------- Disrupt notification popup ---------- */
+  .disrupt-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+    padding: 24px;
+  }
+  .disrupt-card{
+    background: var(--bg-elevated);
+    border: 2px solid var(--accent-coral);
+    border-radius: 28px;
+    padding: 30px 24px 24px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 0 44px 8px rgba(255,90,40,0.35);
+    animation: disrupt-in 0.5s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes disrupt-in{
+    0%{ transform: scale(0.7) rotate(-4deg); opacity: 0; }
+    60%{ transform: scale(1.05) rotate(2deg); opacity: 1; }
+    100%{ transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .disrupt-title{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.15rem;
+    margin-bottom: 16px;
+    line-height: 1.35;
+  }
+  .disrupt-power-name{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: var(--accent-coral);
+    margin-bottom: 8px;
+  }
+  .disrupt-power-desc{
+    font-size: 0.92rem;
+    color: var(--ink-muted);
+    line-height: 1.5;
+    margin-bottom: 22px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .disrupt-card{ animation: none; }
+  }
+
   /* ---------- Manage players panel ---------- */
   .manage-row{
     display: flex;
@@ -1189,7 +1240,7 @@
             <div class="pill-option" data-holes="custom">Custom</div>
           </div>
           <div class="custom-holes" id="customHolesWrap">
-            <input type="number" id="customHolesInput" min="1" max="27" placeholder="Number of holes">
+            <input type="number" id="customHolesInput" min="1" max="27" placeholder="Number of holes" autocomplete="off">
           </div>
         </div>
 
@@ -1209,7 +1260,7 @@
               <span>A tied hole rolls its medal into the next one instead of being lost</span>
             </div>
             <label class="switch">
-              <input type="checkbox" id="accumulateMedalsToggle">
+              <input type="checkbox" id="accumulateMedalsToggle" autocomplete="off">
               <span class="track"></span>
             </label>
           </div>
@@ -1234,7 +1285,7 @@
 
         <div>
           <label>Chaos level — <span id="chaosLabel">Balanced</span></label>
-          <input type="range" id="chaosSlider" min="1" max="5" step="1" value="3">
+          <input type="range" id="chaosSlider" min="1" max="5" step="1" value="3" autocomplete="off">
         </div>
 
         <div class="toggle-row">
@@ -1243,14 +1294,14 @@
             <span>Random challenges everyone follows for a hole</span>
           </div>
           <label class="switch">
-            <input type="checkbox" id="holeEventsToggle">
+            <input type="checkbox" id="holeEventsToggle" autocomplete="off">
             <span class="track"></span>
           </label>
         </div>
 
         <div id="holeEventsFreqWrap" class="disabled">
           <label>Event frequency — <span id="holeEventsFreqLabel">Occasional</span></label>
-          <input type="range" id="holeEventsFreqSlider" min="1" max="3" step="1" value="2">
+          <input type="range" id="holeEventsFreqSlider" min="1" max="3" step="1" value="2" autocomplete="off">
           <p class="modal-empty" id="holeEventsFreqHint">2–3 events per 9 holes</p>
         </div>
 
@@ -1307,6 +1358,12 @@
           <div class="hole-event-desc" id="holeEventDesc"></div>
         </div>
 
+        <div class="powers-section">
+          <h3>Your Powers <button class="info-toggle" id="powersInfoToggle" type="button" aria-label="Toggle help text">ⓘ</button></h3>
+          <p class="sub" id="powersHelpText">Drag a power onto a player above to use it. Help powers only work on yourself — disrupt powers only work on opponents.</p>
+          <div class="powers-tray" id="powersTray"></div>
+        </div>
+
         <div class="score-entry" id="scoreEntry">
           <label>Your score this hole</label>
           <div class="score-stepper">
@@ -1318,12 +1375,6 @@
           <button class="btn-ghost" id="editScoreBtn" type="button" hidden>Edit my score</button>
           <p class="waiting-note" id="scoreWaitingNote" hidden><span class="pulse"></span>Waiting on <span id="waitingNames"></span>…</p>
         </div>
-      </div>
-
-      <div class="powers-section">
-        <h3>Your Powers <button class="info-toggle" id="powersInfoToggle" type="button" aria-label="Toggle help text">ⓘ</button></h3>
-        <p class="sub" id="powersHelpText">Drag a power onto a player above to use it. Help powers only work on yourself — disrupt powers only work on opponents.</p>
-        <div class="powers-tray" id="powersTray"></div>
       </div>
     </section>
 
@@ -1374,6 +1425,15 @@
   </div>
 </div>
 
+<div class="disrupt-overlay" id="disruptOverlay" hidden>
+  <div class="disrupt-card">
+    <div class="disrupt-title" id="disruptTitle"></div>
+    <div class="disrupt-power-name" id="disruptPowerName"></div>
+    <div class="disrupt-power-desc" id="disruptPowerDesc"></div>
+    <button class="btn-primary" id="disruptCloseBtn" type="button">Got it</button>
+  </div>
+</div>
+
 <script type="module">
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
@@ -1402,6 +1462,8 @@ let activePlayerId = playerId;
 let controlledPlayerIds = [playerId];
 let playersUsedPower = new Set(); // players (on this device) who've used a power this round — auto-hides the help text
 let lastPowerInstanceIds = new Set(); // instance ids seen on the last render — used to detect newly-awarded powers for entrance animation
+let seenEffectIdsForActive = new Set(); // effect ids already accounted for on the currently-viewed player
+let lastCheckedActivePlayerId = null; // which player we last baselined seenEffectIdsForActive against
 let powersHelpOverride = {}; // manual (i) toggle override per player id, wins over the auto behavior
 
 const AVATAR_POOL = ['🥏','🏆','🔥','⚡️','🎯','🌪️','🍀','👑','🦄','🐝','🐉','🌵'];
@@ -1446,11 +1508,12 @@ const HOLE_EVENT_RATE = {
 };
 
 function generateHoleEventSchedule(totalHoles, frequencyLevel){
-  if (!EVENTS.length || !totalHoles) return {};
+  if (!EVENTS.length || totalHoles < 2) return {}; // hole 1 never gets an event; need at least one other hole
   const rate = (HOLE_EVENT_RATE[frequencyLevel] || HOLE_EVENT_RATE[2])();
-  const count = Math.max(1, Math.min(totalHoles, Math.round(rate * totalHoles / 9)));
+  const eligibleCount = totalHoles - 1;
+  const count = Math.max(1, Math.min(eligibleCount, Math.round(rate * totalHoles / 9)));
 
-  const holeNumbers = Array.from({ length: totalHoles }, (_, i) => i + 1);
+  const holeNumbers = Array.from({ length: eligibleCount }, (_, i) => i + 2); // holes 2..totalHoles
   for (let i = holeNumbers.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [holeNumbers[i], holeNumbers[j]] = [holeNumbers[j], holeNumbers[i]];
@@ -1572,6 +1635,7 @@ function pickRandomPower(settings){
   tabHost.addEventListener('click', () => {
     tabHost.classList.add('active'); tabJoin.classList.remove('active');
     hostPanel.hidden = false; joinPanel.hidden = true;
+    syncHoleEventsFreqState();
   });
   tabJoin.addEventListener('click', () => {
     tabJoin.classList.add('active'); tabHost.classList.remove('active');
@@ -1656,11 +1720,13 @@ function pickRandomPower(settings){
     holeEventsFreqLabel.textContent = info.name;
     holeEventsFreqHint.textContent = info.hint;
   }
-  holeEventsFreqSlider.addEventListener('input', updateHoleEventsFreqDisplay);
-  holeEventsToggle.addEventListener('change', () => {
+  function syncHoleEventsFreqState(){
     holeEventsFreqWrap.classList.toggle('disabled', !holeEventsToggle.checked);
-  });
+  }
+  holeEventsFreqSlider.addEventListener('input', updateHoleEventsFreqDisplay);
+  holeEventsToggle.addEventListener('change', syncHoleEventsFreqState);
   updateHoleEventsFreqDisplay();
+  syncHoleEventsFreqState();
 
   // ---------- Room code generation ----------
   function generateCode(){
@@ -1747,6 +1813,8 @@ function pickRandomPower(settings){
     playersUsedPower = new Set();
     powersHelpOverride = {};
     lastPowerInstanceIds = new Set();
+    seenEffectIdsForActive = new Set();
+    lastCheckedActivePlayerId = null;
     stopListening = onValue(ref(db, 'rooms/' + code), (snapshot) => {
       const room = snapshot.val();
       if (!room) {
@@ -1759,6 +1827,7 @@ function pickRandomPower(settings){
       }
       latestRoom = room;
       if (!manageModalOverlay.hidden) renderManagePanel(room);
+      if (room.status === 'playing') checkForNewDisruptEffects(room);
       if (room.status === 'playing' || room.status === 'finished') {
         enterGame(code, room);
       } else {
@@ -1963,6 +2032,48 @@ function pickRandomPower(settings){
     el.classList.remove(className);
     void el.offsetWidth; // force reflow so the animation restarts even if the class was already applied
     el.classList.add(className);
+  }
+
+  // ---------- Disrupt notification popup ----------
+  const DISRUPT_QUIPS = [
+    '{name} is trying to mess with your game.',
+    '{name} just threw a wrench in your round.',
+    'Uh oh — {name} has entered the chat.',
+    '{name} decided your round was too easy.',
+    'Chaos alert: {name} is coming for you.',
+    '{name} is not here to make friends.'
+  ];
+
+  function showDisruptPopup(fx){
+    const fromName = (latestRoom && latestRoom.players && latestRoom.players[fx.from] && latestRoom.players[fx.from].name) || 'Someone';
+    const quip = DISRUPT_QUIPS[Math.floor(Math.random() * DISRUPT_QUIPS.length)].replace('{name}', fromName);
+    document.getElementById('disruptTitle').textContent = quip;
+    document.getElementById('disruptPowerName').textContent = fx.name || 'Power';
+    document.getElementById('disruptPowerDesc').textContent = fx.description || '';
+    document.getElementById('disruptOverlay').hidden = false;
+  }
+
+  document.getElementById('disruptCloseBtn').addEventListener('click', () => {
+    document.getElementById('disruptOverlay').hidden = true;
+  });
+
+  function checkForNewDisruptEffects(room){
+    const me = room.players && room.players[activePlayerId];
+    const effects = (me && me.activeEffects) ? Object.entries(me.activeEffects) : [];
+
+    if (lastCheckedActivePlayerId !== activePlayerId) {
+      // just switched to (or first loaded) this player's view — baseline without popping old effects
+      seenEffectIdsForActive = new Set(effects.map(([id]) => id));
+      lastCheckedActivePlayerId = activePlayerId;
+      return;
+    }
+
+    const newDisrupts = effects.filter(([id, fx]) => fx.type === 'disrupt' && !seenEffectIdsForActive.has(id));
+    seenEffectIdsForActive = new Set(effects.map(([id]) => id));
+
+    if (newDisrupts.length > 0) {
+      showDisruptPopup(newDisrupts[0][1]);
+    }
   }
 
   // ---------- Live game ----------
@@ -2476,7 +2587,7 @@ function pickRandomPower(settings){
       <div class="modal-header">
         <div class="disc-chip">${p.avatar || '🥏'}</div>
         <div>
-          <div class="modal-name">${p.name || 'Player'}${id === activePlayerId ? ' (you)' : (controlledPlayerIds.includes(id) ? ' (yours)' : '')}</div>
+          <div class="modal-name">${p.name || 'Player'}${id === activePlayerId ? ' (you)' : ''}</div>
           <div class="modal-sub">${valueLabel} · ${room.hostId === id ? 'Host' : 'Player'}</div>
         </div>
       </div>
