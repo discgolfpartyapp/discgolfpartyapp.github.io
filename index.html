@@ -1462,8 +1462,7 @@ let activePlayerId = playerId;
 let controlledPlayerIds = [playerId];
 let playersUsedPower = new Set(); // players (on this device) who've used a power this round — auto-hides the help text
 let lastPowerInstanceIds = new Set(); // instance ids seen on the last render — used to detect newly-awarded powers for entrance animation
-let seenEffectIdsForActive = new Set(); // effect ids already accounted for on the currently-viewed player
-let lastCheckedActivePlayerId = null; // which player we last baselined seenEffectIdsForActive against
+let shownDisruptEffectIds = new Set(); // effect ids that have already triggered the disrupt popup this room
 let powersHelpOverride = {}; // manual (i) toggle override per player id, wins over the auto behavior
 
 const AVATAR_POOL = ['🥏','🏆','🔥','⚡️','🎯','🌪️','🍀','👑','🦄','🐝','🐉','🌵'];
@@ -1813,8 +1812,7 @@ function pickRandomPower(settings){
     playersUsedPower = new Set();
     powersHelpOverride = {};
     lastPowerInstanceIds = new Set();
-    seenEffectIdsForActive = new Set();
-    lastCheckedActivePlayerId = null;
+    shownDisruptEffectIds = new Set();
     stopListening = onValue(ref(db, 'rooms/' + code), (snapshot) => {
       const room = snapshot.val();
       if (!room) {
@@ -1827,7 +1825,7 @@ function pickRandomPower(settings){
       }
       latestRoom = room;
       if (!manageModalOverlay.hidden) renderManagePanel(room);
-      if (room.status === 'playing') checkForNewDisruptEffects(room);
+      if (room.status === 'playing') checkPendingDisruptForActivePlayer(room);
       if (room.status === 'playing' || room.status === 'finished') {
         enterGame(code, room);
       } else {
@@ -2057,22 +2055,17 @@ function pickRandomPower(settings){
     document.getElementById('disruptOverlay').hidden = true;
   });
 
-  function checkForNewDisruptEffects(room){
+  function checkPendingDisruptForActivePlayer(room){
+    if (!document.getElementById('disruptOverlay').hidden) return; // don't interrupt one already showing
     const me = room.players && room.players[activePlayerId];
+    const currentHole = room.currentHole || 1;
     const effects = (me && me.activeEffects) ? Object.entries(me.activeEffects) : [];
-
-    if (lastCheckedActivePlayerId !== activePlayerId) {
-      // just switched to (or first loaded) this player's view — baseline without popping old effects
-      seenEffectIdsForActive = new Set(effects.map(([id]) => id));
-      lastCheckedActivePlayerId = activePlayerId;
-      return;
-    }
-
-    const newDisrupts = effects.filter(([id, fx]) => fx.type === 'disrupt' && !seenEffectIdsForActive.has(id));
-    seenEffectIdsForActive = new Set(effects.map(([id]) => id));
-
-    if (newDisrupts.length > 0) {
-      showDisruptPopup(newDisrupts[0][1]);
+    const pending = effects.find(([id, fx]) =>
+      fx.type === 'disrupt' && fx.appliedOnHole === currentHole && !shownDisruptEffectIds.has(id)
+    );
+    if (pending) {
+      shownDisruptEffectIds.add(pending[0]);
+      showDisruptPopup(pending[1]);
     }
   }
 
@@ -2212,6 +2205,7 @@ function pickRandomPower(settings){
         renderLeaderboard(room);
         renderHole(currentRoomCode, room);
         renderPowersTray(room);
+        checkPendingDisruptForActivePlayer(room);
       });
       controlTabsEl.appendChild(tab);
     });
@@ -2690,7 +2684,11 @@ function pickRandomPower(settings){
     if (latestRoom) {
       renderManagePanel(latestRoom);
       renderLeaderboard(latestRoom);
-      if (!stepGame.hidden) { renderHole(currentRoomCode, latestRoom); renderPowersTray(latestRoom); }
+      if (!stepGame.hidden) {
+        renderHole(currentRoomCode, latestRoom);
+        renderPowersTray(latestRoom);
+        checkPendingDisruptForActivePlayer(latestRoom);
+      }
     }
     showToast(`You're now controlling ${(latestRoom.players[id] && latestRoom.players[id].name) || 'that player'}.`);
   }
