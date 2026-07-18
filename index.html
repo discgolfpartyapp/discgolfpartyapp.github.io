@@ -2341,7 +2341,7 @@ function pickRandomPower(settings){
             if (!lifted && (startY - ev.clientY) > 14 && Math.abs(dy) > Math.abs(dx)) {
               lifted = true;
               card.removeEventListener('pointermove', onPreMove);
-              startDrag(ev, card, slotIndex, power.type);
+              startDrag(ev, card, slotIndex, power.type, power.tier);
             }
           }
           function onPreEnd(ev){
@@ -2365,13 +2365,15 @@ function pickRandomPower(settings){
         powersTray.appendChild(card);
       } else if (slot.state === 'used') {
         const power = getPower(slot.powerId);
-        const targetName = (room.players[slot.targetPlayerId] && room.players[slot.targetPlayerId].name) || 'them';
+        const sentToText = slot.broadcast
+          ? 'Sent to everyone'
+          : `Sent to ${(room.players[slot.targetPlayerId] && room.players[slot.targetPlayerId].name) || 'them'}${slot.targetPlayerId === activePlayerId ? ' (yourself)' : ''}`;
         const usedCard = document.createElement('div');
         usedCard.className = 'power-card used-card';
         usedCard.innerHTML = `
           <div class="power-tier">used this hole</div>
           <div class="power-name">${power ? power.name : 'Power'}</div>
-          <div class="power-desc">Sent to ${targetName}${slot.targetPlayerId === activePlayerId ? ' (yourself)' : ''}</div>
+          <div class="power-desc">${sentToText}</div>
           <button class="undo-btn" type="button">↺ Undo</button>
         `;
         usedCard.querySelector('.undo-btn').addEventListener('click', () => undoPowerSlot(slotIndex));
@@ -2413,7 +2415,13 @@ function pickRandomPower(settings){
     if (!slot || slot.state !== 'used') return;
     const updates = {};
     updates[`players/${activePlayerId}/powerSlots/${slotIndex}`] = { state: 'held', instanceId: slot.instanceId, powerId: slot.powerId };
-    updates[`players/${slot.targetPlayerId}/activeEffects/${slot.effectId}`] = null;
+    if (slot.broadcast && Array.isArray(slot.targets)) {
+      slot.targets.forEach(({ targetId, effectId }) => {
+        updates[`players/${targetId}/activeEffects/${effectId}`] = null;
+      });
+    } else {
+      updates[`players/${slot.targetPlayerId}/activeEffects/${slot.effectId}`] = null;
+    }
     await update(ref(db, `rooms/${currentRoomCode}`), updates);
     showToast('Power undone.');
   }
@@ -2426,18 +2434,26 @@ function pickRandomPower(settings){
     ghost.style.top = (y - 36) + 'px';
   }
 
-  function updateDropTargets(x, y, type){
+  function updateDropTargets(x, y, type, tier){
+    const isLegendaryDisrupt = type === 'disrupt' && tier === 'legendary';
     document.querySelectorAll('.player-chip').forEach(chip => {
+      const targetId = chip.dataset.playerId;
+      const isSelf = targetId === activePlayerId;
+      if (isLegendaryDisrupt) {
+        // legendary disrupt always hits everyone else — mark all opponents as valid for the whole drag
+        chip.classList.toggle('drop-target-valid', !isSelf);
+        chip.classList.toggle('drop-target-invalid', isSelf);
+        return;
+      }
       const rect = chip.getBoundingClientRect();
       const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-      const targetId = chip.dataset.playerId;
       const valid = (type === 'help' && targetId === activePlayerId) || (type === 'disrupt' && targetId !== activePlayerId);
       chip.classList.toggle('drop-target-valid', inside && valid);
       chip.classList.toggle('drop-target-invalid', inside && !valid);
     });
   }
 
-  function startDrag(e, card, slotIndex, type){
+  function startDrag(e, card, slotIndex, type, tier){
     try { card.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
     card.classList.add('dragging');
 
@@ -2448,13 +2464,14 @@ function pickRandomPower(settings){
     document.body.appendChild(ghost);
     positionGhost(ghost, e.clientX, e.clientY);
 
-    const drag = { pointerId: e.pointerId, slotIndex, type, card, ghost };
+    const drag = { pointerId: e.pointerId, slotIndex, type, tier, card, ghost };
     activeDrag = drag;
+    updateDropTargets(e.clientX, e.clientY, drag.type, drag.tier); // mark legendary-disrupt targets immediately on lift
 
     function onMove(ev){
       if (ev.pointerId !== drag.pointerId) return;
       positionGhost(drag.ghost, ev.clientX, ev.clientY);
-      updateDropTargets(ev.clientX, ev.clientY, drag.type);
+      updateDropTargets(ev.clientX, ev.clientY, drag.type, drag.tier);
     }
     async function onUp(ev){
       if (ev.pointerId !== drag.pointerId) return;
@@ -2481,7 +2498,10 @@ function pickRandomPower(settings){
       const chip = el ? el.closest('.player-chip') : null;
       if (!chip) return;
       const targetId = chip.dataset.playerId;
-      const valid = (drag.type === 'help' && targetId === activePlayerId) || (drag.type === 'disrupt' && targetId !== activePlayerId);
+      const isLegendaryDisrupt = drag.type === 'disrupt' && drag.tier === 'legendary';
+      const valid = isLegendaryDisrupt
+        ? targetId !== activePlayerId
+        : (drag.type === 'help' && targetId === activePlayerId) || (drag.type === 'disrupt' && targetId !== activePlayerId);
       if (!valid) {
         showToast("That power can't be used there.");
         return;
@@ -2503,9 +2523,31 @@ function pickRandomPower(settings){
     const slot = me && me.powerSlots && me.powerSlots[slotIndex];
     if (!slot || slot.state !== 'held') return; // stale drag (e.g. already used elsewhere) — ignore
     const power = getPower(slot.powerId);
-    const effectId = 'fx-' + Math.random().toString(36).slice(2, 9);
     const activeHole = latestRoom.currentHole || 1;
     const updates = {};
+
+    if (power && power.tier === 'legendary' && power.type === 'disrupt') {
+      // legendary disrupts always hit every other player in the room
+      const allTargets = Object.keys(latestRoom.players || {}).filter(id => id !== actingPlayerId && !latestRoom.players[id].left);
+      const targets = allTargets.map(id => ({ targetId: id, effectId: 'fx-' + Math.random().toString(36).slice(2, 9) }));
+      targets.forEach(({ targetId, effectId }) => {
+        updates[`players/${targetId}/activeEffects/${effectId}`] = {
+          name: power.name, type: power.type, tier: power.tier, description: power.description,
+          from: actingPlayerId, appliedAt: Date.now(), appliedOnHole: activeHole
+        };
+      });
+      updates[`players/${actingPlayerId}/powerSlots/${slotIndex}`] = {
+        state: 'used', instanceId: slot.instanceId, powerId: slot.powerId,
+        broadcast: true, targets, hole: activeHole
+      };
+      await update(ref(db, `rooms/${currentRoomCode}`), updates);
+      playersUsedPower.add(actingPlayerId);
+      updatePowersHelpVisibility();
+      showToast(`${power.name} unleashed on everyone!`);
+      return;
+    }
+
+    const effectId = 'fx-' + Math.random().toString(36).slice(2, 9);
     updates[`players/${actingPlayerId}/powerSlots/${slotIndex}`] = {
       state: 'used', instanceId: slot.instanceId, powerId: slot.powerId, targetPlayerId, effectId, hole: activeHole
     };
