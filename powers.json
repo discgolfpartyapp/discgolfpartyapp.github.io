@@ -4,14 +4,28 @@
     "type": "help",
     "tier": "common",
     "name": "Mulligan",
-    "description": "Re-throw your next shot and take whichever result you like better."
+    "description": "Re-throw your latest shot and take whichever result you like better."
   },
   {
-    "id": "gimme-putt",
-    "type": "help",
+    "id": "perfect-lie",
+    "type": "disrupt",
     "tier": "common",
-    "name": "Gimme Putt",
-    "description": "Any putt inside 10 feet on your next hole counts as made."
+    "name": "Perfect Lie",
+    "description": "Change your lie up to 3m / 10ft"
+  },
+  {
+    "id": "scary-scary",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Scary scary",
+    "description": "For their next shot/putt, if the target goes past the basket they receive +2 penalty strokes."
+  },
+  {
+    "id": "big-hole",
+    "type": "help",
+    "tier": "rare",
+    "name": "That's a big hole",
+    "description": "Any throw that lands within 10 feet of the basket on your next hole counts as a make."
   },
   {
     "id": "practice-stroke",
@@ -21,32 +35,46 @@
     "description": "Take one practice throw before your real shot next hole — no penalty."
   },
   {
+    "id": "steady-hands",
+    "type": "help",
+    "tier": "common",
+    "name": "Steady Hands",
+    "description": "Re-throw one missed putt from inside the circle this hole."
+  },
+  {
     "id": "second-wind",
     "type": "help",
     "tier": "rare",
     "name": "Second Wind",
-    "description": "Your worst throw of the next hole doesn't count against your score."
+    "description": "Your first throw of the next hole doesn't count against your score."
   },
   {
     "id": "home-turf",
     "type": "help",
     "tier": "rare",
     "name": "Home Turf",
-    "description": "You choose your own tee position on your next hole."
+    "description": "You choose your own tee position on your next hole (10m / 30ft of the original tee)"
   },
   {
     "id": "phoenix-round",
     "type": "help",
-    "tier": "legendary",
+    "tier": "rare",
     "name": "Phoenix Round",
-    "description": "Erase your worst hole score of the round so far and replace it with par."
+    "description": "You get two throws on each shot on the next hole and get to pick your best one every time"
   },
   {
     "id": "untouchable",
     "type": "help",
-    "tier": "legendary",
+    "tier": "rare",
     "name": "Untouchable",
     "description": "You're immune to the next disrupt power thrown at you. Shrug it off."
+  },
+  {
+    "id": "reverse-grip",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Forehand Grip",
+    "description": "Target must putt with a forehand grip on their next putt."
   },
   {
     "id": "off-hand-only",
@@ -54,6 +82,41 @@
     "tier": "common",
     "name": "Off-Hand Only",
     "description": "Target must throw their next shot with their non-dominant hand."
+  },
+   {
+    "id": "try-again",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Try That Again",
+    "description": "Target is forced to rethrow their latest shot."
+  },
+   {
+    "id": "flip-it",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Flip It!",
+    "description": "Target must throw their next shot holding a disc upside down."
+  },
+   {
+    "id": "worst-shot",
+    "type": "disrupt",
+    "tier": "common",
+    "name": "Worst Shot",
+    "description": "Target must throw two tee shots on the next hole. You pick which one they have to use."
+  },
+   {
+    "id": "pressure-putt",
+    "type": "disrupt",
+    "tier": "rare",
+    "name": "Pressure Putt",
+    "description": "If target misses their next putt inside the circle, they get 2+ strokes on this hole."
+  },
+   {
+    "id": "pillars-of-doom",
+    "type": "disrupt",
+    "tier": "rare",
+    "name": "Pillars of Doom",
+    "description": "For an entire hole, target gets a penalty stroke for each tree they hit."
   },
   {
     "id": "no-run-up",
@@ -63,13 +126,6 @@
     "description": "Target must throw their next shot from a dead standstill."
   },
   {
-    "id": "silent-treatment",
-    "type": "disrupt",
-    "tier": "common",
-    "name": "Silent Treatment",
-    "description": "Target can't ask anyone for advice or a line read on their next throw."
-  },
-  {
     "id": "switch-discs",
     "type": "disrupt",
     "tier": "common",
@@ -77,11 +133,11 @@
     "description": "Target must throw their next shot with a disc you pick from their bag."
   },
   {
-    "id": "blindfold-toss",
+    "id": "blindfold-putt",
     "type": "disrupt",
     "tier": "rare",
-    "name": "Blindfold Toss",
-    "description": "Target throws one shot blindfolded, with a spotter allowed to point only."
+    "name": "Blindfold Putt",
+    "description": "Target must throw their next putt blindfolded"
   },
   {
     "id": "opposite-hand-putt",
@@ -98,17 +154,38 @@
     "description": "Target must throw their next shot from a seated position."
   },
   {
-    "id": "backwards-tee",
+    "id": "one-disc-challenge",
     "type": "disrupt",
-    "tier": "legendary",
-    "name": "Backwards Tee",
-    "description": "Target tees off facing away from the basket and must turn to throw."
+    "tier": "rare",
+    "name": "One Disc Challenge",
+    "description": "Target plays the entire next hole with the disc of your choice (from their bag)"
   },
   {
-    "id": "bag-check",
+    "id": "slow-down",
+    "type": "disrupt",
+    "tier": "rare",
+    "name": "Slow Down",
+    "description": "Target is forced to throw the next hole with their slowest disc"
+  },
+  {
+    "id": "alternating-curse",
     "type": "disrupt",
     "tier": "legendary",
-    "name": "Bag Check",
-    "description": "Target leaves their bag at the tee and plays the whole hole with one disc."
+    "name": "Alternating Curse",
+    "description": "All targets must throw uneven strokes (1,3,5...) with their weak arm"
+  },
+  {
+    "id": "must-make",
+    "type": "disrupt",
+    "tier": "legendary",
+    "name": "Must make",
+    "description": "All targets gets 2+ penalty strokes for missing a putt closer than 20m / 60ft"
+  },
+  {
+    "id": "islanders",
+    "type": "disrupt",
+    "tier": "legendary",
+    "name": "Islanders",
+    "description": "The next par 3 plays like an island hole for all targets. The island is circle 1, and the DZ is 15m / 45ft away from the basket"
   }
 ]
