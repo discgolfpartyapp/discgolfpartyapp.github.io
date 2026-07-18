@@ -1070,6 +1070,91 @@
   }
   .fun-stat-avatar{ font-size: 1rem; }
 
+  /* ---------- Spin the Wheel ---------- */
+  .event-spin-row{ margin-top: 12px; }
+  .event-spin-result{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--accent-gold);
+    background: var(--surface);
+    border: 1.5px solid var(--accent-gold);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    text-align: center;
+  }
+  .wheel-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 85;
+    padding: 24px;
+  }
+  .wheel-card{
+    background: var(--bg-elevated);
+    border-radius: 28px;
+    padding: 26px 22px 24px;
+    max-width: 340px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 60px -18px rgba(0,0,0,0.5);
+  }
+  .wheel-title{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 18px;
+  }
+  .wheel-stage{
+    position: relative;
+    width: 240px;
+    height: 240px;
+    margin: 0 auto 18px;
+  }
+  .wheel-pointer{
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.5rem;
+    color: var(--accent-coral);
+    z-index: 2;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4));
+  }
+  .wheel-disc{
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 4px solid var(--bg-elevated);
+    box-shadow: 0 0 0 3px var(--border-strong);
+    transform: rotate(0deg);
+  }
+  .wheel-seg-a{ fill: var(--accent-teal); }
+  .wheel-seg-b{ fill: var(--accent-gold); }
+  .wheel-seg-c{ fill: var(--accent-coral); }
+  .wheel-seg-d{ fill: var(--surface); }
+  .wheel-seg-text{
+    font-size: 8.5px;
+    font-weight: 700;
+    fill: #ffffff;
+    stroke: rgba(0,0,0,0.55);
+    stroke-width: 0.6px;
+    paint-order: stroke fill;
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
+  .wheel-result{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--accent-gold);
+    margin-bottom: 16px;
+  }
+
   /* ---------- Disrupt notification popup ---------- */
   .disrupt-overlay{
     position: fixed;
@@ -1356,6 +1441,10 @@
           <div class="hole-event-label">⚡ Hole Event</div>
           <div class="hole-event-name" id="holeEventName"></div>
           <div class="hole-event-desc" id="holeEventDesc"></div>
+          <div class="event-spin-row" id="eventSpinRow" hidden>
+            <button class="btn-primary" id="eventSpinBtn" type="button">🎡 Spin</button>
+            <div class="event-spin-result" id="eventSpinResult" hidden></div>
+          </div>
         </div>
 
         <div class="powers-section">
@@ -1434,6 +1523,18 @@
   </div>
 </div>
 
+<div class="wheel-overlay" id="wheelOverlay" hidden>
+  <div class="wheel-card">
+    <div class="wheel-title" id="wheelTitle">Spin the Wheel!</div>
+    <div class="wheel-stage">
+      <div class="wheel-pointer">▼</div>
+      <div class="wheel-disc" id="wheelDisc"></div>
+    </div>
+    <div class="wheel-result" id="wheelResult" hidden></div>
+    <button class="btn-primary" id="wheelCloseBtn" type="button" hidden>Close</button>
+  </div>
+</div>
+
 <script type="module">
 import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
@@ -1506,8 +1607,9 @@ const HOLE_EVENT_RATE = {
   3: () => 4 + Math.floor(Math.random() * 2)  // 4 or 5
 };
 
-function generateHoleEventSchedule(totalHoles, frequencyLevel){
-  if (!EVENTS.length || totalHoles < 2) return {}; // hole 1 never gets an event; need at least one other hole
+function generateHoleEventSchedule(totalHoles, frequencyLevel, scoringMode){
+  const eligibleEvents = EVENTS.filter(e => !e.modes || e.modes.includes(scoringMode));
+  if (!eligibleEvents.length || totalHoles < 2) return {}; // hole 1 never gets an event; need at least one other hole
   const rate = (HOLE_EVENT_RATE[frequencyLevel] || HOLE_EVENT_RATE[2])();
   const eligibleCount = totalHoles - 1;
   const count = Math.max(1, Math.min(eligibleCount, Math.round(rate * totalHoles / 9)));
@@ -1519,10 +1621,10 @@ function generateHoleEventSchedule(totalHoles, frequencyLevel){
   }
   const chosenHoles = holeNumbers.slice(0, count);
 
-  const pool = [...EVENTS];
+  const pool = [...eligibleEvents];
   const schedule = {};
   chosenHoles.forEach(hole => {
-    if (pool.length === 0) pool.push(...EVENTS); // ran out of unique events — allow repeats
+    if (pool.length === 0) pool.push(...eligibleEvents); // ran out of unique events — allow repeats
     const idx = Math.floor(Math.random() * pool.length);
     const event = pool.splice(idx, 1)[0];
     schedule[hole] = event.id;
@@ -1879,7 +1981,7 @@ function pickRandomPower(settings){
     const holeEventsFrequency = parseInt(holeEventsFreqSlider.value, 10);
 
     await Promise.all([powersLoaded, eventsLoaded]);
-    const holeEventsSchedule = holeEventsEnabled ? generateHoleEventSchedule(holes, holeEventsFrequency) : {};
+    const holeEventsSchedule = holeEventsEnabled ? generateHoleEventSchedule(holes, holeEventsFrequency, scoringMode) : {};
 
     await set(ref(db, 'rooms/' + code), {
       hostId: playerId,
@@ -2077,6 +2179,120 @@ function pickRandomPower(settings){
     }
   }
 
+  // ---------- Spin the Wheel ----------
+  function escapeXml(str){
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+  }
+
+  function buildWheelSVG(values){
+    const n = values.length;
+    const size = 240;
+    const cx = size / 2, cy = size / 2, r = size / 2 - 3;
+    const segClasses = ['wheel-seg-a', 'wheel-seg-b', 'wheel-seg-c', 'wheel-seg-d'];
+    const segAngle = 360 / n;
+    let inner = '';
+    for (let i = 0; i < n; i++){
+      const startAngle = i * segAngle - 90;
+      const endAngle = startAngle + segAngle;
+      const startRad = startAngle * Math.PI / 180;
+      const endRad = endAngle * Math.PI / 180;
+      const x1 = cx + r * Math.cos(startRad);
+      const y1 = cy + r * Math.sin(startRad);
+      const x2 = cx + r * Math.cos(endRad);
+      const y2 = cy + r * Math.sin(endRad);
+      const largeArc = segAngle > 180 ? 1 : 0;
+      const cls = segClasses[i % segClasses.length];
+      inner += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" class="${cls}"/>`;
+      const midAngle = startAngle + segAngle / 2;
+      const midRad = midAngle * Math.PI / 180;
+      const lx = cx + (r * 0.6) * Math.cos(midRad);
+      const ly = cy + (r * 0.6) * Math.sin(midRad);
+      const rotateDeg = midAngle + 90;
+      inner += `<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" transform="rotate(${rotateDeg.toFixed(2)} ${lx.toFixed(2)} ${ly.toFixed(2)})" class="wheel-seg-text">${escapeXml(values[i])}</text>`;
+    }
+    return `<svg viewBox="0 0 ${size} ${size}" width="100%" height="100%">${inner}</svg>`;
+  }
+
+  let pendingWheelResult = null;
+
+  function openWheelPopup(event){
+    const values = event.wheelValues || [];
+    if (!values.length) return;
+    document.getElementById('wheelTitle').textContent = event.name;
+    const disc = document.getElementById('wheelDisc');
+    disc.innerHTML = buildWheelSVG(values);
+    disc.style.transition = 'none';
+    disc.style.transform = 'rotate(0deg)';
+    document.getElementById('wheelResult').hidden = true;
+    document.getElementById('wheelCloseBtn').hidden = true;
+    document.getElementById('wheelOverlay').hidden = false;
+
+    const idx = Math.floor(Math.random() * values.length);
+    const segAngle = 360 / values.length;
+    const segCenter = idx * segAngle + segAngle / 2;
+    const extraSpins = 5 + Math.floor(Math.random() * 3); // 5-7 full turns for effect
+    const rotation = extraSpins * 360 + (360 - segCenter);
+    const duration = 2 + Math.random() * 2; // 2-4 seconds, as requested
+
+    // force layout before starting the transition so it always animates from 0deg
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        disc.style.transition = `transform ${duration}s cubic-bezier(.17,.67,.16,.99)`;
+        disc.style.transform = `rotate(${rotation}deg)`;
+      });
+    });
+
+    const onEnd = (ev) => {
+      if (ev.propertyName !== 'transform') return;
+      disc.removeEventListener('transitionend', onEnd);
+      pendingWheelResult = values[idx];
+      document.getElementById('wheelResult').textContent = pendingWheelResult;
+      document.getElementById('wheelResult').hidden = false;
+      document.getElementById('wheelCloseBtn').hidden = false;
+    };
+    disc.addEventListener('transitionend', onEnd);
+  }
+
+  document.getElementById('eventSpinBtn').addEventListener('click', () => {
+    if (!latestRoom) return;
+    const hole = latestRoom.currentHole || 1;
+    const eventId = latestRoom.holeEvents && latestRoom.holeEvents[hole];
+    const event = eventId ? getEvent(eventId) : null;
+    if (!event || event.eventType !== 'spin-wheel') return;
+    openWheelPopup(event);
+  });
+
+  document.getElementById('wheelCloseBtn').addEventListener('click', async () => {
+    document.getElementById('wheelOverlay').hidden = true;
+    if (pendingWheelResult && currentRoomCode && latestRoom) {
+      const hole = latestRoom.currentHole || 1;
+      const result = pendingWheelResult;
+      pendingWheelResult = null;
+      await set(ref(db, `rooms/${currentRoomCode}/spinResults/${hole}/${activePlayerId}`), result);
+      if (latestRoom) renderHole(currentRoomCode, latestRoom);
+    }
+  });
+
+  function renderEventSpinRow(room, hole, event){
+    const spinRow = document.getElementById('eventSpinRow');
+    const spinBtn = document.getElementById('eventSpinBtn');
+    const spinResult = document.getElementById('eventSpinResult');
+    if (!event || event.eventType !== 'spin-wheel') {
+      spinRow.hidden = true;
+      return;
+    }
+    spinRow.hidden = false;
+    const myResult = room.spinResults && room.spinResults[hole] && room.spinResults[hole][activePlayerId];
+    if (myResult) {
+      spinBtn.hidden = true;
+      spinResult.hidden = false;
+      spinResult.textContent = `Your spin: ${myResult}`;
+    } else {
+      spinBtn.hidden = false;
+      spinResult.hidden = true;
+    }
+  }
+
   // ---------- Live game ----------
   const holeLabel = document.getElementById('holeLabel');
   const scoreValueEl = document.getElementById('scoreValue');
@@ -2241,6 +2457,7 @@ function pickRandomPower(settings){
     if (event) {
       document.getElementById('holeEventName').textContent = event.name;
       document.getElementById('holeEventDesc').textContent = event.description;
+      renderEventSpinRow(room, hole, event);
       if (holeChanged) {
         // fresh hole advance — hide it now, and schedule the drop-in reveal
         holeEventBanner.hidden = true;
@@ -2262,6 +2479,7 @@ function pickRandomPower(settings){
     } else {
       holeEventBanner.hidden = true;
       eventDropPendingForHole = null;
+      document.getElementById('eventSpinRow').hidden = true;
     }
 
     const holeScores = (room.scores && room.scores[hole]) || {};
@@ -2838,12 +3056,17 @@ function pickRandomPower(settings){
     const scoringMode = getScoringMode(room);
     const updates = {};
 
+    const currentEventId = room.holeEvents && room.holeEvents[hole];
+    const currentEvent = currentEventId ? getEvent(currentEventId) : null;
+    const isDoubleHole = !!(currentEvent && currentEvent.effect === 'double-points');
+
     if (scoringMode === 'party') {
+      const multiplier = isDoubleHole ? 2 : 1;
       const sorted = [...players].sort((a, b) => holeScores[a] - holeScores[b]);
       let rank = 0, prevScore = null;
       sorted.forEach((id, idx) => {
         if (holeScores[id] !== prevScore) { rank = idx; prevScore = holeScores[id]; }
-        const pointsAward = Math.max(players.length - rank, 0);
+        const pointsAward = Math.max(players.length - rank, 0) * multiplier;
         const current = room.players[id].points || 0;
         updates[`players/${id}/points`] = current + pointsAward;
       });
@@ -2852,8 +3075,10 @@ function pickRandomPower(settings){
       const currentPot = room.medalPot || 1;
       if (winners.length === 1) {
         const winnerId = winners[0];
+        // a double-points hole always awards a flat 2 medals — it doesn't multiply whatever the pot has built up to
+        const awardAmount = isDoubleHole ? 2 : currentPot;
         const current = room.players[winnerId].medals || 0;
-        updates[`players/${winnerId}/medals`] = current + currentPot;
+        updates[`players/${winnerId}/medals`] = current + awardAmount;
         updates.medalPot = 1;
       } else {
         // tied hole — no medal awarded
