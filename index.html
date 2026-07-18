@@ -1110,43 +1110,59 @@
   }
   .wheel-stage{
     position: relative;
-    width: 240px;
-    height: 240px;
+    width: 100%;
+    max-width: 280px;
     margin: 0 auto 18px;
   }
-  .wheel-pointer{
-    position: absolute;
-    top: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1.5rem;
-    color: var(--accent-coral);
-    z-index: 2;
-    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.4));
-  }
-  .wheel-disc{
+  .reel-window{
+    position: relative;
     width: 100%;
-    height: 100%;
-    border-radius: 50%;
+    height: 192px;
     overflow: hidden;
-    border: 4px solid var(--bg-elevated);
-    box-shadow: 0 0 0 3px var(--border-strong);
-    transform: rotate(0deg);
+    border-radius: 16px;
+    background: var(--surface);
+    border: 2px solid var(--border-strong);
   }
-  .wheel-seg-a{ fill: var(--accent-teal); }
-  .wheel-seg-b{ fill: var(--accent-gold); }
-  .wheel-seg-c{ fill: var(--accent-coral); }
-  .wheel-seg-d{ fill: var(--surface); }
-  .wheel-seg-text{
-    font-size: 8.5px;
+  .reel-strip{
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+  }
+  .reel-item{
+    height: 64px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 16px;
+    box-sizing: border-box;
+    font-family: var(--font-display);
     font-weight: 700;
-    fill: #ffffff;
-    stroke: rgba(0,0,0,0.55);
-    stroke-width: 0.6px;
-    paint-order: stroke fill;
-    text-anchor: middle;
-    dominant-baseline: middle;
+    font-size: 0.92rem;
+    color: var(--ink-muted);
   }
+  .reel-selection{
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    height: 64px;
+    border-top: 2px solid var(--accent-gold);
+    border-bottom: 2px solid var(--accent-gold);
+    background: color-mix(in srgb, var(--accent-gold) 10%, transparent);
+    pointer-events: none;
+  }
+  .reel-fade-top, .reel-fade-bottom{
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 44px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .reel-fade-top{ top: 0; background: linear-gradient(to bottom, var(--surface), transparent); }
+  .reel-fade-bottom{ bottom: 0; background: linear-gradient(to top, var(--surface), transparent); }
   .wheel-result{
     font-family: var(--font-display);
     font-weight: 700;
@@ -1527,8 +1543,12 @@
   <div class="wheel-card">
     <div class="wheel-title" id="wheelTitle">Spin the Wheel!</div>
     <div class="wheel-stage">
-      <div class="wheel-pointer">▼</div>
-      <div class="wheel-disc" id="wheelDisc"></div>
+      <div class="reel-window">
+        <div class="reel-strip" id="reelStrip"></div>
+        <div class="reel-selection"></div>
+        <div class="reel-fade-top"></div>
+        <div class="reel-fade-bottom"></div>
+      </div>
     </div>
     <div class="wheel-result" id="wheelResult" hidden></div>
     <button class="btn-primary" id="wheelCloseBtn" type="button" hidden>Close</button>
@@ -2180,37 +2200,22 @@ function pickRandomPower(settings){
   }
 
   // ---------- Spin the Wheel ----------
-  function escapeXml(str){
-    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
-  }
+  const REEL_ITEM_HEIGHT = 64;
+  const REEL_REPEATS = 8; // how many times the value list is tiled to give the reel room to spin
 
-  function buildWheelSVG(values){
-    const n = values.length;
-    const size = 240;
-    const cx = size / 2, cy = size / 2, r = size / 2 - 3;
-    const segClasses = ['wheel-seg-a', 'wheel-seg-b', 'wheel-seg-c', 'wheel-seg-d'];
-    const segAngle = 360 / n;
-    let inner = '';
-    for (let i = 0; i < n; i++){
-      const startAngle = i * segAngle - 90;
-      const endAngle = startAngle + segAngle;
-      const startRad = startAngle * Math.PI / 180;
-      const endRad = endAngle * Math.PI / 180;
-      const x1 = cx + r * Math.cos(startRad);
-      const y1 = cy + r * Math.sin(startRad);
-      const x2 = cx + r * Math.cos(endRad);
-      const y2 = cy + r * Math.sin(endRad);
-      const largeArc = segAngle > 180 ? 1 : 0;
-      const cls = segClasses[i % segClasses.length];
-      inner += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" class="${cls}"/>`;
-      const midAngle = startAngle + segAngle / 2;
-      const midRad = midAngle * Math.PI / 180;
-      const lx = cx + (r * 0.6) * Math.cos(midRad);
-      const ly = cy + (r * 0.6) * Math.sin(midRad);
-      const rotateDeg = midAngle + 90;
-      inner += `<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" transform="rotate(${rotateDeg.toFixed(2)} ${lx.toFixed(2)} ${ly.toFixed(2)})" class="wheel-seg-text">${escapeXml(values[i])}</text>`;
+  function buildReelStrip(values){
+    const strip = document.getElementById('reelStrip');
+    strip.innerHTML = '';
+    strip.style.transition = 'none';
+    strip.style.transform = 'translateY(0px)';
+    for (let r = 0; r < REEL_REPEATS; r++){
+      values.forEach(v => {
+        const item = document.createElement('div');
+        item.className = 'reel-item';
+        item.textContent = v;
+        strip.appendChild(item);
+      });
     }
-    return `<svg viewBox="0 0 ${size} ${size}" width="100%" height="100%">${inner}</svg>`;
   }
 
   let pendingWheelResult = null;
@@ -2219,38 +2224,36 @@ function pickRandomPower(settings){
     const values = event.wheelValues || [];
     if (!values.length) return;
     document.getElementById('wheelTitle').textContent = event.name;
-    const disc = document.getElementById('wheelDisc');
-    disc.innerHTML = buildWheelSVG(values);
-    disc.style.transition = 'none';
-    disc.style.transform = 'rotate(0deg)';
+    buildReelStrip(values);
     document.getElementById('wheelResult').hidden = true;
     document.getElementById('wheelCloseBtn').hidden = true;
     document.getElementById('wheelOverlay').hidden = false;
 
-    const idx = Math.floor(Math.random() * values.length);
-    const segAngle = 360 / values.length;
-    const segCenter = idx * segAngle + segAngle / 2;
-    const extraSpins = 5 + Math.floor(Math.random() * 3); // 5-7 full turns for effect
-    const rotation = extraSpins * 360 + (360 - segCenter);
+    const n = values.length;
+    const resultIdx = Math.floor(Math.random() * n);
+    // land deep into the tiled strip so there's a long, satisfying scroll before stopping
+    const landingPos = (REEL_REPEATS - 1) * n + resultIdx;
     const duration = 2 + Math.random() * 2; // 2-4 seconds, as requested
+    const strip = document.getElementById('reelStrip');
+    const targetY = -(landingPos - 1) * REEL_ITEM_HEIGHT; // -1 so the winning item centers in the selection window
 
-    // force layout before starting the transition so it always animates from 0deg
+    // force layout before starting the transition so it always animates from the top
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        disc.style.transition = `transform ${duration}s cubic-bezier(.17,.67,.16,.99)`;
-        disc.style.transform = `rotate(${rotation}deg)`;
+        strip.style.transition = `transform ${duration}s cubic-bezier(.12,.7,.15,1)`;
+        strip.style.transform = `translateY(${targetY}px)`;
       });
     });
 
     const onEnd = (ev) => {
       if (ev.propertyName !== 'transform') return;
-      disc.removeEventListener('transitionend', onEnd);
-      pendingWheelResult = values[idx];
+      strip.removeEventListener('transitionend', onEnd);
+      pendingWheelResult = values[resultIdx];
       document.getElementById('wheelResult').textContent = pendingWheelResult;
       document.getElementById('wheelResult').hidden = false;
       document.getElementById('wheelCloseBtn').hidden = false;
     };
-    disc.addEventListener('transitionend', onEnd);
+    strip.addEventListener('transitionend', onEnd);
   }
 
   document.getElementById('eventSpinBtn').addEventListener('click', () => {
