@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Disc Golf Party</title>
 <meta name="description" content="A disc golf scoring app with powers, chaos, and a party in every round.">
-<meta name="theme-color" content="#0F1B14">
+<meta name="theme-color" content="#EEF3EA">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -35,18 +35,18 @@
   }
   html[data-theme="dark"]{
     color-scheme: dark;
-    --bg: #0F1B14;
-    --bg-elevated: #16261C;
-    --surface: #1C2F23;
-    --ink: #F2F7F0;
-    --ink-muted: #A6BBAC;
+    --bg: #1E2F24;
+    --bg-elevated: #263C2C;
+    --surface: #2F4A35;
+    --ink: #F7FBF5;
+    --ink-muted: #CBDCC9;
     --accent-teal: #2DD4A7;
     --accent-teal-ink: #06231A;
     --accent-gold: #F2B705;
     --accent-gold-ink: #241800;
     --accent-coral: #FF7A6E;
-    --border: rgba(242,247,240,0.12);
-    --border-strong: rgba(242,247,240,0.22);
+    --border: rgba(247,251,245,0.22);
+    --border-strong: rgba(247,251,245,0.34);
     --shadow-color: 0,0,0;
   }
 
@@ -1563,14 +1563,22 @@ function pickRandomPower(settings){
   // ---------- Theme ----------
   const root = document.documentElement;
   const themeToggle = document.getElementById('themeToggle');
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  const THEME_COLORS = { light: '#EEF3EA', dark: '#1E2F24' };
+  function applyThemeColor(theme){
+    if (themeColorMeta) themeColorMeta.setAttribute('content', THEME_COLORS[theme] || THEME_COLORS.light);
+  }
   const savedTheme = localStorage.getItem('dgp-theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  root.setAttribute('data-theme', savedTheme || (prefersDark ? 'dark' : 'light'));
+  const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+  root.setAttribute('data-theme', initialTheme);
+  applyThemeColor(initialTheme);
 
   themeToggle.addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     localStorage.setItem('dgp-theme', next);
+    applyThemeColor(next);
   });
 
   // ---------- Avatar picker ----------
