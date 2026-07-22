@@ -30,9 +30,9 @@
     "eventType": "regular"
   },
   {
-    "id": "opposite-stance-putts",
-    "name": "Opposite Stance",
-    "description": "All putts must be thrown with your stance reversed (opposite foot forward).",
+    "id": "tradle-up",
+    "name": "Stradle up!",
+    "description": "All throws this hole needs to be made from a stradle stance (wide stance with both feet pointing forward)",
     "eventType": "regular"
   },
   {
@@ -56,13 +56,13 @@
   {
     "id": "no-practice-throws",
     "name": "Grip It and Rip It",
-    "description": "There can be no longer than 5 seconds between tee shots on this hole. Line up and get ready!",
+    "description": "There can be no longer than 5 seconds between tee shots on this hole. Line up and get ready! ()",
     "eventType": "regular"
   },
   {
     "id": "forehand-only-approach",
     "name": "Chicken Wing",
-    "description": "Every approach shot must be thrown forehand — backhand is banned this hole.",
+    "description": "Every shot this hole must be a thrown with a forehand — backhand is banned this hole.",
     "eventType": "regular"
   },
   {
@@ -98,7 +98,7 @@
     "eventType": "spin-wheel",
     "wheelValues": [
       "Overstable putt/approach",
-      "Go to putter",
+      "Go-to putter",
       "Straightest midrange",
       "Fastest disc you have",
       "Understable midrange",
