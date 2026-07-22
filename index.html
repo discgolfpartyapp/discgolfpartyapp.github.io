@@ -2805,13 +2805,14 @@ function pickRandomPower(settings){
     const activeNow = received.filter(fx => (fx.appliedOnHole || 1) === currentHole);
     const previousReceived = received.filter(fx => (fx.appliedOnHole || 1) !== currentHole);
 
+    // only disrupts count toward "who's targeting who" — helping yourself doesn't make anyone a rival
     const receivedFromCounts = {};
-    received.forEach(fx => { receivedFromCounts[fx.from] = (receivedFromCounts[fx.from] || 0) + 1; });
-    let nemesisId = null, nemesisCount = 0;
-    Object.entries(receivedFromCounts).forEach(([pid, count]) => { if (count > nemesisCount) { nemesisCount = count; nemesisId = pid; } });
+    received.filter(fx => fx.type === 'disrupt').forEach(fx => { receivedFromCounts[fx.from] = (receivedFromCounts[fx.from] || 0) + 1; });
+    let abuserId = null, abuserCount = 0;
+    Object.entries(receivedFromCounts).forEach(([pid, count]) => { if (count > abuserCount) { abuserCount = count; abuserId = pid; } });
 
     const givenToCounts = {};
-    given.forEach(fx => { givenToCounts[fx.targetId] = (givenToCounts[fx.targetId] || 0) + 1; });
+    given.filter(fx => fx.type === 'disrupt').forEach(fx => { givenToCounts[fx.targetId] = (givenToCounts[fx.targetId] || 0) + 1; });
     let targetId = null, targetCount = 0;
     Object.entries(givenToCounts).forEach(([pid, count]) => { if (count > targetCount) { targetCount = count; targetId = pid; } });
 
@@ -2820,9 +2821,8 @@ function pickRandomPower(settings){
     Object.values(scores).forEach(holeScores => { if (holeScores[id] != null) myScores.push(holeScores[id]); });
     const holesPlayed = myScores.length;
     const avgScore = holesPlayed ? (myScores.reduce((a, b) => a + b, 0) / holesPlayed).toFixed(1) : '—';
-    const bestHole = holesPlayed ? Math.min(...myScores) : '—';
 
-    return { received, activeNow, previousReceived, givenCount: given.length, nemesisId, nemesisCount, targetId, targetCount, holesPlayed, avgScore, bestHole };
+    return { received, activeNow, previousReceived, givenCount: given.length, abuserId, abuserCount, targetId, targetCount, holesPlayed, avgScore };
   }
 
   function powerRowHtml(fx, room){
@@ -2842,7 +2842,7 @@ function pickRandomPower(settings){
     if (!p) return;
     openModalPlayerId = id;
     const stats = computePlayerStats(room, id);
-    const nemesisName = stats.nemesisId ? (room.players[stats.nemesisId]?.name || 'Someone') : null;
+    const abuserName = stats.abuserId ? (room.players[stats.abuserId]?.name || 'Someone') : null;
     const targetName = stats.targetId ? (room.players[stats.targetId]?.name || 'Someone') : null;
     const scoringMode = getScoringMode(room);
     const value = scoreValueFor(room, id, scoringMode);
@@ -2871,12 +2871,11 @@ function pickRandomPower(settings){
       <div class="stat-grid">
         <div class="stat-box"><div class="stat-value">${stats.holesPlayed}</div><div class="stat-label">Holes played</div></div>
         <div class="stat-box"><div class="stat-value">${stats.avgScore}</div><div class="stat-label">Average score</div></div>
-        <div class="stat-box"><div class="stat-value">${stats.bestHole}</div><div class="stat-label">Best hole</div></div>
+        <div class="stat-box"><div class="stat-value">${targetName || '—'}</div><div class="stat-label">Favorite target</div></div>
         <div class="stat-box"><div class="stat-value">${stats.received.length}</div><div class="stat-label">Powers received</div></div>
         <div class="stat-box"><div class="stat-value">${stats.givenCount}</div><div class="stat-label">Powers given</div></div>
-        <div class="stat-box"><div class="stat-value">${nemesisName || '—'}</div><div class="stat-label">Arch nemesis</div></div>
+        <div class="stat-box"><div class="stat-value">${abuserName || '—'}</div><div class="stat-label">Most abused by</div></div>
       </div>
-      ${targetName ? `<p class="modal-empty">Favorite target: <strong>${targetName}</strong> (${stats.targetCount} power${stats.targetCount > 1 ? 's' : ''} sent their way)</p>` : ''}
     `;
     playerModalOverlay.hidden = false;
   }
