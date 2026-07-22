@@ -1488,7 +1488,6 @@
       <div class="step-eyebrow"><span class="dot"></span>Round complete</div>
       <div id="summaryContent"></div>
       <button class="btn-primary" id="exitToHomeBtn" type="button">Exit to Home</button>
-      <button class="btn-ghost" id="endRoundBtn" type="button" hidden>End Round &amp; Clear Data</button>
     </section>
 
   </main>
@@ -3213,8 +3212,6 @@ function pickRandomPower(settings){
       ${funStatRow('Most disrupted', summary.mostDisrupted, room, 'times')}
       <div class="fun-stat-row"><span class="fun-stat-label">Total powers in play</span><span class="fun-stat-value">${summary.totalPowersUsed}</span></div>
     `;
-
-    document.getElementById('endRoundBtn').hidden = room.hostId !== playerId;
   }
 
   function resetToHome(){
@@ -3233,10 +3230,11 @@ function pickRandomPower(settings){
     stepIdentity.hidden = false;
   }
 
-  document.getElementById('exitToHomeBtn').addEventListener('click', resetToHome);
-  document.getElementById('endRoundBtn').addEventListener('click', async () => {
-    if (!currentRoomCode) return;
-    await remove(ref(db, 'rooms/' + currentRoomCode));
+  document.getElementById('exitToHomeBtn').addEventListener('click', async () => {
+    // the host clearing out takes the room's data with them; anyone else just leaves quietly
+    if (currentRoomCode && latestRoom && latestRoom.hostId === playerId) {
+      await remove(ref(db, 'rooms/' + currentRoomCode));
+    }
     resetToHome();
   });
 
